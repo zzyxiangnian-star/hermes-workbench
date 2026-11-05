@@ -1,5 +1,5 @@
 import { Button, ErrorState, cn } from '@hermes/plugin-sdk'
-import { openPage, useLocation, useWorkbenches } from './registry'
+import { openPage, toPath, useLocation, useWorkbenches } from './registry'
 
 /**
  * 对应 hermes-agent 源码 `apps/desktop/src/app/layout-constants.ts` 第 9 行：
@@ -87,7 +87,7 @@ export function WorkbenchPage() {
             title="找不到这个页面"
             description={
               location
-                ? `未找到路径 /workbench/${location.workbench}/${location.page} 对应的工作台分页。`
+                ? `未找到路径 ${toPath(location)} 对应的工作台分页。`
                 : '当前路径未匹配到任何已注册的工作台分页。'
             }
           >

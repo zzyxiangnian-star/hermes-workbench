@@ -76,7 +76,8 @@ function setupWorkbenchPlugin(ctx: PluginContext) {
     render: () => <WorkbenchPane />
   })
 
-  // 5. 注册主区域页面路由（带中文标题）
+  // 5. 注册主区域页面路由（带中文标题）。路径是单段 /wb-<工作台>-<分页>，
+  // 多段 /workbench/<wb>/<page> 会被宿主当成聊天路由。
   // 参考 apps/desktop/src/plugins/kanban/plugin.tsx 第 107-113 行 与 apps/desktop/src/app/chat/route-tile.tsx 第 54 行。
   for (const wb of listWorkbenches()) {
     for (const page of wb.pages) {

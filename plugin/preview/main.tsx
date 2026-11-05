@@ -56,7 +56,7 @@ function PreviewApp() {
   const [paneWidth, setPaneWidth] = useState<200 | 260 | 360>(260)
   const [emptyMode, setEmptyMode] = useState(false)
   const [longNameDemo, setLongNameDemo] = useState(false)
-  const [currentPath, setCurrentPath] = useState('/workbench/ecommerce/overview')
+  const [currentPath, setCurrentPath] = useState('/wb-ecommerce-overview')
   const location = useLocation()
 
   useEffect(() => {
@@ -93,7 +93,17 @@ function PreviewApp() {
       {/* 顶部调试控制条 */}
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-(--ui-stroke-secondary) bg-(--ui-bg-quinary) px-3 py-1.5 text-xs">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 font-medium text-(--ui-text-secondary)">W01 预览控制：</span>
+          <span className="mr-1 font-medium text-(--ui-text-secondary)">预览控制：</span>
+          <Button
+            size="xs"
+            variant={location?.page === 'products' ? 'default' : 'outline'}
+            onClick={() => {
+              setEmptyMode(false)
+              openPage({ workbench: 'ecommerce', page: 'products' })
+            }}
+          >
+            商品页
+          </Button>
 
           <Button
             size="xs"

@@ -47,14 +47,17 @@ export function useWorkbenches(): WorkbenchDef[] {
   return useSyncExternalStore(subscribeWorkbenches, listWorkbenches, listWorkbenches)
 }
 
+// Hermes RouteContribution 只保证单段路径（routes.ts：“One segment; no params”）。
+// `/workbench/<wb>/<page>` 有三段，宿主会把它落到聊天视图并新开一个 UNTITLED SESSION。
+// 因此用单段 `/wb-<workbench>-<page>`，例如 `/wb-ecommerce-products`。
 export function toPath(loc: WorkbenchLocation): string {
-  return `/workbench/${encodeURIComponent(loc.workbench)}/${encodeURIComponent(loc.page)}`
+  return `/wb-${encodeURIComponent(loc.workbench)}-${encodeURIComponent(loc.page)}`
 }
 
 export function parsePath(path: string): WorkbenchLocation | undefined {
   if (!path) return undefined
   const clean = path.replace(/^#/, '').split('?')[0].trim()
-  const match = /^\/workbench\/([^/?#]+)\/([^/?#]+)\/?$/.exec(clean)
+  const match = /^\/wb-([^/?#]+)-([^/?#]+)\/?$/.exec(clean)
   if (!match) return undefined
   try {
     return {
