@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
+from app.folder_import import import_dir, scan
 from app.importer import import_ad_spend, import_metrics, import_products, parse_mapping
 from app.models import ImportRun
 from app.schemas import ImportRunOut, RuleRunOut
@@ -82,3 +83,15 @@ def _run_out(run: ImportRun, stats: dict | None) -> ImportRunOut:
         created_at=run.created_at,
         rules=RuleRunOut.model_validate(stats) if stats is not None else None,
     )
+
+
+@router.get("/import/folder")
+def folder_status() -> dict:
+    root = import_dir()
+    return {"enabled": root is not None, "path": str(root) if root else None, "exists": bool(root and root.is_dir())}
+
+
+@router.post("/import/folder/scan")
+def folder_scan(request: Request) -> dict:
+    """立即扫一遍报表文件夹（不等定时）。刚放进去 10 秒内的文件也会导。"""
+    return scan(request.app.state.session_factory, settle_seconds=0)

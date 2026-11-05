@@ -278,6 +278,20 @@
 }
 ```
 
+## 报表文件夹（C06）
+
+`GET /api/import/folder` → `{"enabled": true, "path": "D:\\工作台报表", "exists": true}`。没设 `WB_IMPORT_DIR` 时 `enabled` 是 `false`。
+
+`POST /api/import/folder/scan` 立即扫一遍（不等 10 秒的稳定期）。没配置时 400 `import_dir_not_configured`，文件夹不存在 400 `import_dir_missing`。
+
+```json
+{"path": "D:\\工作台报表", "imported": 3, "failed": 1, "files": [
+  {"shop": "星年天猫旗舰店", "file": "商品1105.xlsx", "kind": "products", "ok": true, "rows_ok": 28, "rows_failed": 2, "reason": null},
+  {"shop": "没有这个店", "file": "a.csv", "kind": null, "ok": false, "rows_ok": 0, "rows_failed": 0, "reason": "工作台里没有叫“没有这个店”的店铺，请先在商品页新建，或把文件夹改成店铺名"}]}
+```
+
+每个文件导入后照常写 `import_runs`，商品表导完自动查商品规则，投放表导完自动查投放规则。
+
 ## 健康检查
 
 `GET /api/health`

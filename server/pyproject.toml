@@ -26,6 +26,7 @@ dev = [
 [project.scripts]
 workbench-api = "app.main:run"
 workbench-mcp = "app.mcp_server:main"
+workbench-demo = "app.demo:main"
 
 [build-system]
 requires = ["setuptools>=68"]

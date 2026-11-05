@@ -5,3 +5,6 @@ plugin/node_modules/
 plugin/dist/
 plugin/.vite/
 *.local
+server/.venv/
+server/data/*.db
+server/scripts/env.bat

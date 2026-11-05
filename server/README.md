@@ -1,6 +1,28 @@
-# Hermes 工作台 · 商品后端
+# Hermes 工作台 · 后端
 
-第一期没有平台接口授权。商品从客户导出的 Excel / CSV 导入，再按规则列出异常。只监听本机，不登录、不改价、不报名。
+电商工作台（经营、商品）和品牌活动工作台（活动、内容、资料）的后端，外加给 Hermes Bot 用的 MCP 工具（`/mcp`）。第一期没有平台接口授权，数据从客户导出的 Excel / CSV 导入。只监听本机，不登录平台、不改价、不报名、不代发内容。
+
+## Windows 一键启动
+
+- `scripts\start.bat`：启动正式后端（第一次会自动建虚拟环境、装依赖）。
+- `scripts\demo.bat`：重建一套演示数据（`data\demo.db`，全是假数据，日期按今天往前推 30 天），再用它启动。不碰正式库。
+- 设置：把 `scripts\env.example.bat` 复制成 `scripts\env.bat` 再改（报表文件夹、早报时间、推送地址）。`env.bat` 不进仓库。
+
+## 报表文件夹自动导入
+
+设了 `WB_IMPORT_DIR` 就启用。每个店铺一个子文件夹，名字和工作台里的店铺名一字不差；运营把后台导出的表直接扔进去：
+
+```
+D:\工作台报表\
+  星年天猫旗舰店\  商品1105.xlsx  经营1105.xlsx  投放1105.csv
+  星年京东自营店\  ...
+```
+
+按表头自动认出是商品、经营还是投放表。每 `WB_IMPORT_EVERY` 分钟（默认 10，0 表示只在早报前扫一次）扫一遍，早报前也会先扫一遍。导入成功的移到该店铺下的 `已导入\`（有坏行时旁边放一份 `.原因.txt`），失败的移到 `失败\` 并写明原因。刚放进去不到 10 秒的文件下一轮再导，避免读到写了一半的文件。也可以手动触发：`POST /api/import/folder/scan`；`GET /api/import/folder` 看是否启用。
+
+## 演示数据
+
+`python -m app.demo`（或 `workbench-demo`）写到 `data/demo.db`，`--db` 可换路径。4 个店铺（星年天猫、京东、拼多多，木屿抖音）、30 天经营和投放、约 20 条商品问题、昨天的 3 条投放提醒、品牌规范、4 张商品资料卡、3 个活动（已结束可复盘 / 进行中 / 即将开始）、4 篇稿件（已发布、送审中、被退回、品牌助手写的含违禁词草稿）。
 
 ## 环境
 
@@ -27,7 +49,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 每天 `WB_DAILY_AT`（默认 `08:30`，上海时区）跑商品规则、投放规则，再生成昨天的日报。配了 `WB_FEISHU_WEBHOOK` 或 `WB_WECOM_WEBHOOK` 才推送。`WB_SCHEDULER=off` 关掉定时任务。
 
-接口说明在 `docs/CONTRACT-products.md` 和 `docs/CONTRACT-overview.md`。
+接口说明在 `docs/CONTRACT-products.md`、`docs/CONTRACT-overview.md`、`docs/CONTRACT-brand.md`，MCP 工具在 `docs/CONTRACT-mcp.md`。
 
 ## 导入样表
 
