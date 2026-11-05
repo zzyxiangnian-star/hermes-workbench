@@ -31,6 +31,9 @@ EXPECTED_TOOLS = {
     "wb_list_inquiries",
     "wb_get_inquiry",
     "wb_add_inquiry_note",
+    "wb_list_design_requests",
+    "wb_get_design_request",
+    "wb_add_design_candidate",
 }
 
 
@@ -83,7 +86,7 @@ def test_tool_list_is_read_only_plus_note(client):
         assert tool["description"], tool["name"]
         assert any("一" <= ch <= "鿿" for ch in tool["description"]), tool["name"]
     forbidden = ("status", "rule", "import", "send", "price", "delete", "update", "patch", "set")
-    for name in names - {"wb_add_note", "wb_create_draft", "wb_add_install_note", "wb_add_inquiry_note"}:
+    for name in names - {"wb_add_note", "wb_create_draft", "wb_add_install_note", "wb_add_inquiry_note", "wb_add_design_candidate"}:
         assert not any(word in name for word in forbidden), name
     note_params = set(next(t for t in tools if t["name"] == "wb_add_note")["inputSchema"]["properties"])
     assert note_params == {"issue_id", "note"}
@@ -250,7 +253,7 @@ def test_bot_configs_only_name_existing_tools(client):
     names = {tool["name"] for tool in rpc(client, "tools/list")["result"]["tools"]}
     bots = Path(__file__).resolve().parents[2] / "bots"
     configs = sorted(bots.glob("*/config.yaml"))
-    assert len(configs) == 2
+    assert len(configs) == 3
     for config in configs:
         data = yaml.safe_load(config.read_text(encoding="utf-8"))
         include = data["mcp_servers"]["hermes-workbench"]["tools"]["include"]
@@ -353,3 +356,38 @@ def test_customer_tools_mask_contact_info(client):
     assert noted["note"].startswith("[电商助手] ")
     failed, message = call(client, "wb_list_customers", segment="bad")
     assert failed and "分层" in message
+
+
+def test_design_assistant_hands_in_candidates(client, tmp_path, monkeypatch):
+    import base64
+
+    from test_design import png
+
+    req = client.post(
+        "/api/design-requests",
+        json={"title": "空调主图", "kind": "main_image", "brand": "星年", "sizes": ["800x800"], "copy_text": "一级能效"},
+    ).json()
+    failed, data = call(client, "wb_list_design_requests")
+    assert not failed and data["items"][0]["id"] == req["id"]
+
+    data_url = "data:image/png;base64," + base64.b64encode(png()).decode()
+    failed, handed = call(client, "wb_add_design_candidate", request_id=req["id"], image=data_url, prompt="浅色客厅里的白色挂机", note="突出省电")
+    assert not failed, handed
+    assert handed["request_status"] == "reviewing"
+    assert handed["candidate"]["source"] == "ai" and handed["candidate"]["created_by"] == "设计助手"
+    assert handed["candidate"]["label"] == "A"
+
+    hermes = tmp_path / "hermes"
+    hermes.mkdir()
+    (hermes / "gen.png").write_bytes(png(shade=9))
+    monkeypatch.setenv("WB_AI_IMAGE_DIRS", str(hermes))
+    failed, second = call(client, "wb_add_design_candidate", request_id=req["id"], image=str(hermes / "gen.png"))
+    assert not failed and second["candidate"]["label"] == "B"
+    failed, message = call(client, "wb_add_design_candidate", request_id=req["id"], image=str(tmp_path / "x.png"))
+    assert failed and "生图目录" in message
+
+    failed, detail = call(client, "wb_get_design_request", request_id=req["id"])
+    assert not failed and len(detail["candidates"]) == 2
+    client.post(f"/api/design-requests/{req['id']}/finalize", json={"asset_ids": [handed["candidate"]["id"]]})
+    failed, message = call(client, "wb_add_design_candidate", request_id=req["id"], image=data_url)
+    assert failed and "已定稿" in message

@@ -1,4 +1,4 @@
-"""电商助手、品牌助手用的 MCP 工具。只读为主；写操作只有四个：给商品问题、安装工单、询盘追加备注，新建稿件草稿。
+"""电商助手、品牌助手用的 MCP 工具。只读为主；写操作只有五个：给商品问题、安装工单、询盘追加备注，新建稿件草稿，给设计需求单交候选稿。
 
 HTTP：随主服务挂在 /mcp（Streamable HTTP）。
 本地调试：python -m app.mcp_server --stdio
@@ -38,6 +38,9 @@ from app.installs import add_note as add_install_note
 from app.api.customers import _inquiry, get_customer, get_inquiry, inquiry_detail, inquiry_products
 from app.api.customers import list_customers, list_inquiries, segment_summary
 from app.customers import add_inquiry_note, mask_text
+from app.api.design import _request as _design_request
+from app.api.design import asset_out, get_request as get_design_request, list_requests as list_design_requests
+from app.design import add_candidate, load_ai_image, store_file
 from app.installs import mask_address, mask_name, mask_phone
 from app.brand_schemas import ContentIn
 from app.contents import compliance_of
@@ -51,14 +54,15 @@ from app.reports import build_daily_report, report_day
 
 NOTE_PREFIX = "[电商助手] "
 AI_AUTHOR = "品牌助手"
+AI_DESIGNER = "设计助手"
 MAX_ISSUES = 50
 MAX_NOTE = 500
 
 INSTRUCTIONS = (
     "Hermes 工作台的数据。电商：商品问题、单个商品、经营总览、趋势、投放提醒、日报、安装工单（顾客信息已打码），"
     "客户档案和会员分层、B 端询盘和报价（客户信息已打码），可给商品问题、安装工单和询盘追加备注。"
-    "品牌活动：活动日历和复盘、违禁词检查、商品资料卡、品牌规范、稿件，可把文案存成新草稿。"
-    "不能改状态、改规则、导入数据、发日报、改价，不能建报价单或批量跟进、不能给客户发消息，不能送审、通过或发布稿件，也不能新建或修改活动和资料。"
+    "品牌活动：活动日历和复盘、违禁词检查、商品资料卡、品牌规范、稿件，可把文案存成新草稿；设计需求单，可把生成的图交成候选稿。"
+    "不能改状态、改规则、导入数据、发日报、改价，不能建报价单或批量跟进、不能给客户发消息，不能送审、通过或发布稿件，不能定稿、退回或删除设计稿，也不能新建或修改活动和资料。"
 )
 
 
@@ -522,6 +526,65 @@ def build_mcp(session_factory: sessionmaker) -> Any:
             add_inquiry_note(item, "电商助手", NOTE_PREFIX + text)
             session.flush()
             return _masked_inquiry(inquiry_detail(item))
+
+        return run(write)
+
+    # ---- C09 设计（生图助手）----
+
+    @mcp.tool(
+        description=(
+            "列出设计需求单。status：active 未完成（默认）/ open 待接单 / in_progress 设计中 / reviewing 待评审 / "
+            "done 已定稿 / cancelled 已取消。kind：main_image 主图 / detail_page 详情页 / poster 海报 / banner 横幅 / "
+            "video_cover 视频封面 / other。最多 50 条。"
+        )
+    )
+    def wb_list_design_requests(
+        status: str | None = "active", brand: str | None = None, limit: int = 20
+    ) -> dict[str, Any]:
+        size = max(1, min(int(limit), MAX_ISSUES))
+
+        def query(session: Session) -> dict:
+            items = list_design_requests(
+                status=status, brand=brand, kind=None, campaign_id=None, product_code=None, assignee=None, q=None,
+                session=session,
+            )
+            return {"total": len(items), "items": items[:size]}
+
+        return run(query)
+
+    @mcp.tool(
+        description=(
+            "查一张设计需求单：类型、尺寸、图上文案（含违禁词检查）、需求说明、截止日、参考图、各轮候选稿、"
+            "评审批注（含图上位置 x/y，0–1）和处理记录。商品卖点用 wb_get_product_card，品牌色和字体用 wb_get_brand_guide。"
+        )
+    )
+    def wb_get_design_request(request_id: int) -> dict[str, Any]:
+        return run(lambda session: get_design_request(request_id=request_id, session=session))
+
+    @mcp.tool(
+        description=(
+            "把一张生成好的图交给设计需求单，当作这一轮的候选稿（标 AI 生成），需求单会进入待评审，由人定稿或退回。"
+            "image 填 image_generate 返回的 image：https 链接、data:image 链接，或 Hermes 生图目录里的本机文件路径。"
+            f"只收 PNG、JPG、GIF、WebP，单张最多 20 MB，每轮 AI 最多交 8 张。prompt 填生成用的提示词，note 写设计思路（最多 {MAX_NOTE} 字）。"
+        )
+    )
+    def wb_add_design_candidate(
+        request_id: int, image: str, prompt: str | None = None, note: str | None = None
+    ) -> dict[str, Any]:
+        note_text = (note or "").strip() or None
+        if note_text and len(note_text) > MAX_NOTE:
+            raise ToolFailure(f"说明最多 {MAX_NOTE} 字")
+        prompt_text = (prompt or "").strip()[:4000] or None
+
+        def write(session: Session) -> Any:
+            item = _design_request(session, request_id)
+            if item.status in {"done", "cancelled"}:
+                raise AppError(409, "request_closed", "需求单已定稿或已取消，不能再交稿")
+            data, name = load_ai_image(image)
+            asset = add_candidate(
+                session, item, store_file(data, name), by=AI_DESIGNER, source="ai", prompt=prompt_text, note=note_text
+            )
+            return {"request_status": item.status, "round": item.round, "candidate": asset_out(asset)}
 
         return run(write)
 

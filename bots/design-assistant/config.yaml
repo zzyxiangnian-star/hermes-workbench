@@ -1,0 +1,24 @@
+# 设计助手（生图）Bot 的配置片段。
+# 创建 Bot 时从 default 克隆（模型和 Key 沿用 default），再把下面两段合并进该 Bot 的 config.yaml。
+# 注意：MCP 写在 config.yaml 的 mcp_servers 里，Bot 不读 mcp.json。
+# 生图用 Hermes 自带的 image_gen 工具集（image_generate），要先在 Hermes 里配好生图服务，见 README。
+
+mcp_servers:
+  hermes-workbench:
+    url: http://127.0.0.1:8000/mcp
+    tools:
+      include:
+        - wb_list_design_requests
+        - wb_get_design_request
+        - wb_add_design_candidate
+        - wb_get_product_card
+        - wb_get_brand_guide
+        - wb_check_compliance
+
+agent:
+  # 只需要生图（image_gen）和看图（vision）；不执行命令、不操作浏览器、不跑代码、不改本地文件。
+  disabled_toolsets:
+    - terminal
+    - browser
+    - code_execution
+    - file

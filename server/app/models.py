@@ -9,6 +9,7 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -607,3 +608,94 @@ class FollowupTarget(Base):
 
     followup: Mapped[Followup] = relationship(back_populates="targets")
     customer: Mapped[Customer] = relationship()
+
+
+# ---- C09 设计：设计需求单、素材（参考图、候选稿、定稿、素材库）、图上批注 ----
+
+DESIGN_KINDS = ("main_image", "detail_page", "poster", "banner", "video_cover", "other")
+DESIGN_STATUSES = ("open", "in_progress", "reviewing", "done", "cancelled")
+ASSET_ROLES = ("reference", "candidate", "final", "library")
+
+
+class DesignRequest(Base):
+    __tablename__ = "design_requests"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('main_image', 'detail_page', 'poster', 'banner', 'video_cover', 'other')",
+            name="ck_design_requests_kind",
+        ),
+        CheckConstraint(
+            "status IN ('open', 'in_progress', 'reviewing', 'done', 'cancelled')", name="ck_design_requests_status"
+        ),
+        Index("ix_design_requests_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    brand: Mapped[str] = mapped_column(String(200), nullable=False)
+    campaign_id: Mapped[int | None] = mapped_column(ForeignKey("campaigns.id", ondelete="SET NULL"))
+    product_code: Mapped[str | None] = mapped_column(String(128))
+    sizes: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    copy_text: Mapped[str | None] = mapped_column(Text)
+    brief: Mapped[str | None] = mapped_column(Text)
+    due_date: Mapped[date | None] = mapped_column(Date)
+    requester: Mapped[str | None] = mapped_column(String(100))
+    assignee: Mapped[str | None] = mapped_column(String(100))
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="open")
+    round: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    events: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    campaign: Mapped[Campaign | None] = relationship()
+
+
+class Asset(Base):
+    __tablename__ = "assets"
+    __table_args__ = (
+        CheckConstraint("role IN ('reference', 'candidate', 'final', 'library')", name="ck_assets_role"),
+        CheckConstraint("source IN ('upload', 'ai')", name="ck_assets_source"),
+        Index("ix_assets_request_id", "request_id"),
+        Index("ix_assets_role", "role"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    request_id: Mapped[int | None] = mapped_column(ForeignKey("design_requests.id", ondelete="SET NULL"))
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    file_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    stored_path: Mapped[str] = mapped_column(String(255), nullable=False)
+    mime: Mapped[str] = mapped_column(String(100), nullable=False)
+    size: Mapped[int] = mapped_column(Integer, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    width: Mapped[int | None] = mapped_column(Integer)
+    height: Mapped[int | None] = mapped_column(Integer)
+    brand: Mapped[str | None] = mapped_column(String(200))
+    product_code: Mapped[str | None] = mapped_column(String(128))
+    campaign_id: Mapped[int | None] = mapped_column(ForeignKey("campaigns.id", ondelete="SET NULL"))
+    kind: Mapped[str | None] = mapped_column(String(16))
+    tags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="upload")
+    prompt: Mapped[str | None] = mapped_column(Text)
+    round: Mapped[int | None] = mapped_column(Integer)
+    label: Mapped[str | None] = mapped_column(String(8))
+    note: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    request: Mapped[DesignRequest | None] = relationship()
+
+
+class DesignComment(Base):
+    __tablename__ = "design_comments"
+    __table_args__ = (Index("ix_design_comments_request_id", "request_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    request_id: Mapped[int] = mapped_column(ForeignKey("design_requests.id", ondelete="CASCADE"), nullable=False)
+    asset_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"))
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    x: Mapped[float | None] = mapped_column(Float)
+    y: Mapped[float | None] = mapped_column(Float)
+    author: Mapped[str | None] = mapped_column(String(100))
+    resolved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

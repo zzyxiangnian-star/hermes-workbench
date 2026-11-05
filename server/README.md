@@ -49,7 +49,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 每天 `WB_DAILY_AT`（默认 `08:30`，上海时区）跑商品规则、投放规则，再生成昨天的日报。配了 `WB_FEISHU_WEBHOOK` 或 `WB_WECOM_WEBHOOK` 才推送。`WB_SCHEDULER=off` 关掉定时任务。
 
-接口说明在 `docs/CONTRACT-products.md`、`docs/CONTRACT-overview.md`、`docs/CONTRACT-brand.md`，安装工单在 `docs/CONTRACT-installs.md`，客户和询盘在 `docs/CONTRACT-customers.md`，MCP 工具在 `docs/CONTRACT-mcp.md`。
+接口说明在 `docs/CONTRACT-products.md`、`docs/CONTRACT-overview.md`、`docs/CONTRACT-brand.md`，安装工单在 `docs/CONTRACT-installs.md`，客户和询盘在 `docs/CONTRACT-customers.md`，设计需求单和素材在 `docs/CONTRACT-design.md`，MCP 工具在 `docs/CONTRACT-mcp.md`。
 
 ## 导入样表
 

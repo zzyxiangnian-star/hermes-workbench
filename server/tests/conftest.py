@@ -11,6 +11,7 @@ def client(tmp_path, monkeypatch):
     monkeypatch.delenv("WB_WECOM_WEBHOOK", raising=False)
     monkeypatch.delenv("WB_ALLOWED_ORIGINS", raising=False)
     monkeypatch.delenv("WORKBENCH_DATABASE_URL", raising=False)
+    monkeypatch.setenv("WB_ASSET_DIR", str(tmp_path / "assets"))
     database = "sqlite:///" + (tmp_path / "test.db").resolve().as_posix()
     app = create_app(database)
     with TestClient(app) as test_client:

@@ -13,6 +13,7 @@ if errorlevel 1 (
 .venv\Scripts\python.exe -m app.demo || (pause & exit /b 1)
 set WORKBENCH_DATABASE_URL=sqlite:///%CD:\=/%/data/demo.db
 set WB_SCHEDULER=off
+set WB_ASSET_DIR=%CD%\data\demo-assets
 echo 演示后端已启动：http://127.0.0.1:8000  （关闭这个窗口就停止）
 .venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 pause

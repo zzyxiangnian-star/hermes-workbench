@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from . import ad_rules, alerts, brand_assets, campaigns, contents, customers, health, installs, imports, issues, overview, products, reports, rules, shops
+from . import ad_rules, alerts, brand_assets, campaigns, contents, customers, design, health, installs, imports, issues, overview, products, reports, rules, shops
 
 api_router = APIRouter(prefix="/api")
 api_router.include_router(health.router)
@@ -18,3 +18,4 @@ api_router.include_router(campaigns.router)
 api_router.include_router(contents.router)
 api_router.include_router(installs.router)
 api_router.include_router(customers.router)
+api_router.include_router(design.router)

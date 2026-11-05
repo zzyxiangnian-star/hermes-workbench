@@ -14,5 +14,7 @@ def test_demo_builds_a_lively_but_small_dataset(tmp_path, monkeypatch):
     assert 10 <= summary["安装工单"] <= 40
     assert 40 <= summary["客户"] <= 60
     assert summary["询盘"] == 3
+    assert summary["设计需求单"] == 3
+    assert (tmp_path / "demo-assets").is_dir()
     again = build(db)
     assert again == summary  # 固定随机种子，同一天重跑结果一样

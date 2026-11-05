@@ -27,7 +27,6 @@ from app.installs import (
     export_csv,
     import_orders,
     is_overdue,
-    local_text,
     money,
     order_code,
     sync_installs,
@@ -95,7 +94,6 @@ def list_installs(
             | Order.buyer_name.ilike(pattern, escape="\\")
             | Order.phone.ilike(pattern, escape="\\")
         )
-    now = utcnow()
     items = [install_out(session, item) for item in session.scalars(stmt).unique()]
     if overdue is not None:
         items = [item for item in items if item["overdue"] == overdue]

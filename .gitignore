@@ -8,3 +8,4 @@ plugin/.vite/
 server/.venv/
 server/data/*.db
 server/scripts/env.bat
+server/data/assets/

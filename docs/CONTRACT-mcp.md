@@ -37,6 +37,12 @@
 | `wb_get_inquiry` | `inquiry_id` | 询盘详情 + `products`（资料卡）（打码） | `GET /api/inquiries/{id}` + `/products` |
 | `wb_add_inquiry_note` | `inquiry_id`、`note`（1–500 字） | 询盘详情（打码） | `POST /api/inquiries/{id}/notes` |
 
+| `wb_list_design_requests` | `status`=active、`brand`、`limit` | `{total, items: 需求单[]}` | `GET /api/design-requests` |
+| `wb_get_design_request` | `request_id` | 需求单详情（参考图、各轮候选稿、批注、文案检查） | `GET /api/design-requests/{id}` |
+| `wb_add_design_candidate` | `request_id`、`image`、`prompt`、`note`（≤500 字） | `{request_status, round, candidate}` | `POST /api/design-requests/{id}/assets` |
+
+C09 的 3 个给设计助手用，字段见 [CONTRACT-design.md](CONTRACT-design.md)。`image` 填 Hermes `image_generate` 返回的 `image`：https 链接（只允许公网地址，不跟随跳转）、`data:image/…;base64,…`，或 `WB_AI_IMAGE_DIRS`（默认 `~/.hermes`）里的本机文件。只收 PNG、JPG、GIF、WebP，单张 ≤20 MB，每张单每轮 AI 最多 8 张。交的稿记为 `source=ai`、`created_by=设计助手`。
+
 C08 的 5 个也给电商助手用，字段见 [CONTRACT-customers.md](CONTRACT-customers.md)。姓名和联系人只留姓、手机留前三后四，询盘原文和备注里的手机号也打码。
 
 C07 的 3 个给电商助手用，字段见 [CONTRACT-installs.md](CONTRACT-installs.md)。顾客姓名、手机、地址在返回前打码；备注加 `[电商助手] ` 前缀、不改状态。
@@ -54,4 +60,4 @@ C04、C05 的 8 个给品牌助手用，字段见 [CONTRACT-brand.md](CONTRACT-b
 
 ## 故意不做成工具的
 
-改问题或提醒的状态、改规则和投放规则、导入表格、发送日报、改价；新建或修改活动、任务、资料卡、品牌规范、违禁词；修改已有稿件、送审、审核、标记发布；改安装工单状态、导出预约表、生成顾客通知；改询盘状态、出报价单、建或审核批量跟进、导出跟进名单、标记已发。这些都由人在工作台里操作。测试 `test_tool_list_is_read_only_plus_note` 会在有人加了这类工具时失败。
+改问题或提醒的状态、改规则和投放规则、导入表格、发送日报、改价；新建或修改活动、任务、资料卡、品牌规范、违禁词；修改已有稿件、送审、审核、标记发布；改安装工单状态、导出预约表、生成顾客通知；改询盘状态、出报价单、建或审核批量跟进、导出跟进名单、标记已发；新建或修改设计需求单、定稿、退回、删除素材、上传素材库。这些都由人在工作台里操作。测试 `test_tool_list_is_read_only_plus_note` 会在有人加了这类工具时失败。

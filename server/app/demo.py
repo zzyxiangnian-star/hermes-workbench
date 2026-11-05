@@ -10,6 +10,9 @@
 from __future__ import annotations
 
 import argparse
+import shutil
+import struct
+import zlib
 import csv
 import io
 import os
@@ -63,6 +66,10 @@ def build(db_path: Path) -> dict:
 
     if db_path.exists():
         db_path.unlink()
+    assets = db_path.parent / f"{db_path.stem}-assets"
+    shutil.rmtree(assets, ignore_errors=True)
+    previous_assets = os.environ.get("WB_ASSET_DIR")
+    os.environ["WB_ASSET_DIR"] = str(assets)
     db_path.parent.mkdir(parents=True, exist_ok=True)
     app = create_app("sqlite:///" + db_path.resolve().as_posix())
     rng = random.Random(20261105)
@@ -78,6 +85,7 @@ def build(db_path: Path) -> dict:
         _brand(api, rng, end)
         _orders(api, shops, rng, end)
         _customers(api, shops, rng, end)
+        _design(api, end)
         summary = {
             "数据库": str(db_path),
             "日期范围": f"{start} 至 {end}",
@@ -89,7 +97,12 @@ def build(db_path: Path) -> dict:
             "安装工单": len(api.get("/api/installs")),
             "客户": api.get("/api/customers/segments")["total"],
             "询盘": len(api.get("/api/inquiries")),
+            "设计需求单": len(api.get("/api/design-requests")),
         }
+    if previous_assets is None:
+        os.environ.pop("WB_ASSET_DIR", None)
+    else:
+        os.environ["WB_ASSET_DIR"] = previous_assets
     return summary
 
 
@@ -456,6 +469,89 @@ def _customers(api: _Api, shops: dict, rng: random.Random, end: date) -> None:
             "by": "运营小林",
         },
     )
+
+
+def _picture(width: int, height: int, top: tuple, bottom: tuple) -> bytes:
+    """演示用的占位图：上下两色渐变的 PNG，不是真设计稿。"""
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    rows = []
+    for y in range(height):
+        t = y / max(height - 1, 1)
+        pixel = bytes(round(a + (b - a) * t) for a, b in zip(top, bottom))
+        rows.append(b"\x00" + pixel * width)
+    header = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(b"".join(rows), 9)) + chunk(b"IEND", b"")
+
+
+def _design(api: _Api, end: date) -> None:
+    """3 张设计需求单（待评审、待接单、已定稿）和素材库里的两张品牌素材。图都是纯色占位图。"""
+    client = api.client
+
+    def upload(path: str, name: str, data: bytes, form: dict) -> dict:
+        return api._check(client.post(path, data=form, files={"file": (name, data)}))
+
+    campaigns = {c["name"]: c for c in api.get("/api/campaigns")}
+    double11 = next((c for name, c in campaigns.items() if "双 11" in name), None)
+    main = api.post(
+        "/api/design-requests",
+        {
+            "title": "双 11 空调主图（1.5 匹挂机）",
+            "kind": "main_image",
+            "brand": "星年",
+            "campaign_id": double11["id"] if double11 else None,
+            "product_code": "XN-AC35",
+            "sizes": ["800x800", "750x1000"],
+            "copy_text": "一级能效 · 新风自清洁 · 含基础安装",
+            "brief": "浅色客厅场景，突出一级能效标识和“含基础安装”；左上留出放价格的位置。",
+            "due_date": (end + timedelta(days=3)).isoformat(),
+            "requester": "运营小林",
+            "assignee": "设计师阿杰",
+        },
+    )
+    upload(f"/api/design-requests/{main['id']}/assets", "参考-去年主图.png", _picture(400, 400, (230, 230, 225), (120, 130, 140)), {"role": "reference", "by": "运营小林"})
+    api.post(f"/api/design-requests/{main['id']}/status", {"status": "in_progress", "by": "设计师阿杰"})
+    first = upload(f"/api/design-requests/{main['id']}/assets", "主图-A.png", _picture(400, 400, (245, 244, 240), (200, 16, 46)), {"role": "candidate", "by": "设计师阿杰"})
+    upload(f"/api/design-requests/{main['id']}/assets", "主图-B.png", _picture(400, 400, (31, 41, 55), (245, 245, 244)), {"role": "candidate", "by": "设计助手", "note": "深色背景版本"})
+    api.post(f"/api/design-requests/{main['id']}/comments", {"body": "能效标再大一点，放到右上", "asset_id": first["id"], "x": 0.82, "y": 0.18, "author": "王经理"})
+
+    detail = api.post(
+        "/api/design-requests",
+        {
+            "title": "电水壶详情页首屏",
+            "kind": "detail_page",
+            "brand": "星年",
+            "product_code": "XN-KT17",
+            "sizes": ["790x1200"],
+            "copy_text": "双层防烫 · 1.7L 大容量",
+            "brief": "首屏讲防烫，配一张手摸壶身的场景图。",
+            "due_date": (end + timedelta(days=7)).isoformat(),
+            "requester": "运营小林",
+        },
+    )
+    upload(f"/api/design-requests/{detail['id']}/assets", "参考-场景.png", _picture(300, 450, (250, 240, 230), (180, 160, 140)), {"role": "reference", "by": "运营小林"})
+
+    poster = api.post(
+        "/api/design-requests",
+        {
+            "title": "木屿夏凉被换季海报",
+            "kind": "poster",
+            "brand": "木屿",
+            "product_code": "MY-QT04",
+            "sizes": ["1080x1920"],
+            "copy_text": "轻薄透气，换季正好",
+            "requester": "木屿运营",
+            "assignee": "设计师阿杰",
+        },
+    )
+    api.post(f"/api/design-requests/{poster['id']}/status", {"status": "in_progress", "by": "设计师阿杰"})
+    final = upload(f"/api/design-requests/{poster['id']}/assets", "海报.png", _picture(270, 480, (220, 235, 245), (90, 140, 180)), {"role": "candidate", "by": "设计师阿杰"})
+    api.post(f"/api/design-requests/{poster['id']}/finalize", {"asset_ids": [final["id"]], "by": "木屿运营"})
+
+    upload("/api/assets", "星年-Logo-白底.png", _picture(300, 120, (255, 255, 255), (255, 255, 255)), {"brand": "星年", "tags": "Logo,白底"})
+    upload("/api/assets", "星年-Logo-反白.png", _picture(300, 120, (200, 16, 46), (200, 16, 46)), {"brand": "星年", "tags": "Logo,反白"})
 
 
 def main() -> None:

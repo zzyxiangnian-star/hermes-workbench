@@ -31,6 +31,9 @@ EXPECTED_TABLES = {
     "quotes",
     "followups",
     "followup_targets",
+    "design_requests",
+    "assets",
+    "design_comments",
     "alembic_version",
 }
 
