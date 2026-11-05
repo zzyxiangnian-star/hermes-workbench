@@ -5,7 +5,7 @@
 ## 文件
 
 - `SOUL.md`：Bot 的人设和规矩，复制为该 Bot 的 SOUL.md。
-- `config.yaml`：要合并进该 Bot `config.yaml` 的片段（MCP 地址、关掉的工具集）。
+- `config.yaml`：要合并进该 Bot `config.yaml` 的片段（MCP 地址、只放开的 8 个工具、关掉的工具集）。
 
 ## 安装
 

@@ -15,6 +15,11 @@ EXPECTED_TOOLS = {
     "wb_list_alerts",
     "wb_get_daily_report",
     "wb_add_note",
+    "wb_list_campaigns",
+    "wb_get_campaign",
+    "wb_check_compliance",
+    "wb_get_product_card",
+    "wb_get_brand_guide",
 }
 
 
@@ -189,3 +194,54 @@ def test_add_note_cannot_change_status(client):
     assert "result" in result or "error" in result
     [after] = issues(client, status="open")
     assert after["status"] == "open"
+
+
+def test_brand_tools(client):
+    _products(client)
+    client.put("/api/brand-guides/星年", json={"tone": "亲切"})
+    client.post("/api/product-cards", json={"product_code": "F1", "brand": "星年", "name": "电饭煲"})
+    created = client.post(
+        "/api/campaigns",
+        json={"name": "双 11", "brand": "星年", "kind": "holiday", "start_date": "2026-11-01", "end_date": "2026-11-11", "use_template": True},
+    ).json()
+
+    failed, data = call(client, "wb_list_campaigns", date_from="2026-11-05", date_to="2026-11-06")
+    assert not failed and [item["name"] for item in data["items"]] == ["双 11"]
+    failed, data = call(client, "wb_get_campaign", campaign_id=created["id"])
+    assert not failed, data
+    assert data["campaign"]["tasks_total"] == 5
+    assert data["review"]["markdown"].startswith("# 活动复盘")
+    failed, message = call(client, "wb_get_campaign", campaign_id=999)
+    assert failed and "活动不存在" in message
+
+    failed, data = call(client, "wb_check_compliance", text="最佳电饭煲")
+    assert not failed and data["passed"] is False and data["hits"][0]["word"] == "最佳"
+
+    failed, data = call(client, "wb_get_product_card", product_code="F1")
+    assert not failed and data["items"][0]["name"] == "电饭煲"
+    assert data["items"][0]["listings"][0]["price"] == 189.0
+    failed, data = call(client, "wb_get_product_card", q="电饭")
+    assert not failed and len(data["items"]) == 1
+    failed, message = call(client, "wb_get_product_card", product_code="NONE")
+    assert failed and "资料卡" in message
+
+    failed, data = call(client, "wb_get_brand_guide", brand="星年")
+    assert not failed and data["tone"] == "亲切"
+    failed, message = call(client, "wb_get_brand_guide", brand="别家")
+    assert failed and "品牌规范" in message
+
+
+def test_bot_configs_only_name_existing_tools(client):
+    from pathlib import Path
+
+    import yaml
+
+    names = {tool["name"] for tool in rpc(client, "tools/list")["result"]["tools"]}
+    bots = Path(__file__).resolve().parents[2] / "bots"
+    configs = sorted(bots.glob("*/config.yaml"))
+    assert len(configs) == 2
+    for config in configs:
+        data = yaml.safe_load(config.read_text(encoding="utf-8"))
+        include = data["mcp_servers"]["hermes-workbench"]["tools"]["include"]
+        assert set(include) <= names, config
+        assert {"terminal", "browser"} <= set(data["agent"]["disabled_toolsets"]), config

@@ -1,4 +1,4 @@
-"""电商助手用的 MCP 工具。只读为主，唯一的写操作是给问题追加备注。
+"""电商助手、品牌助手用的 MCP 工具。只读为主，唯一的写操作是给商品问题追加备注。
 
 HTTP：随主服务挂在 /mcp（Streamable HTTP）。
 本地调试：python -m app.mcp_server --stdio
@@ -19,10 +19,13 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload, sessionmaker
 
 from app.api.alerts import list_alerts
+from app.api.brand_assets import card_out, get_guide, list_cards
+from app.api.campaigns import _campaign, campaign_detail, list_campaigns
 from app.api.issues import _issue_out, list_issues
 from app.api.reports import _report_out
 from app.errors import AppError
-from app.models import Issue, Product
+from app.brand import campaign_review, check_text
+from app.models import Issue, Product, ProductCard
 from app.overview import build_overview, build_trend, overview_payload
 from app.reports import build_daily_report, report_day
 
@@ -31,8 +34,9 @@ MAX_ISSUES = 50
 MAX_NOTE = 500
 
 INSTRUCTIONS = (
-    "Hermes 工作台的电商数据。可以查商品问题、单个商品、经营总览、趋势、投放提醒和日报，"
-    "并能给商品问题追加备注。不能改状态、改规则、导入数据、发日报或改价。"
+    "Hermes 工作台的数据。电商：商品问题、单个商品、经营总览、趋势、投放提醒、日报，可给商品问题追加备注。"
+    "品牌活动：活动日历和复盘、违禁词检查、商品资料卡、品牌规范。"
+    "不能改状态、改规则、导入数据、发日报、改价，也不能新建或修改活动和资料。"
 )
 
 
@@ -209,6 +213,77 @@ def build_mcp(session_factory: sessionmaker) -> FastMCP:
             return _issue_out(issue)
 
         return run(write)
+
+    # ---- C04 品牌活动（只读）----
+
+    @mcp.tool(
+        description=(
+            "列出活动（活动日历）。可按时间段（date_from、date_to，YYYY-MM-DD，返回和这段时间有交集的活动）、"
+            "品牌、状态（planning 筹备 / running 进行中 / ended 已结束 / cancelled 已取消）筛选。"
+        )
+    )
+    def wb_list_campaigns(
+        date_from: str | None = None,
+        date_to: str | None = None,
+        brand: str | None = None,
+        status: str | None = None,
+    ) -> dict[str, Any]:
+        start, end = _parse_day(date_from), _parse_day(date_to)
+        return run(
+            lambda session: {
+                "items": list_campaigns(date_from=start, date_to=end, brand=brand, status=status, session=session)
+            }
+        )
+
+    @mcp.tool(
+        description=(
+            "查一个活动的详情和任务清单，以及复盘数据：活动期间该品牌所有店铺的访客、订单、销售额、投放花费、ROI，"
+            "和活动前同样天数的对比，目标完成率、预算使用率，并附一段复盘 Markdown。"
+        )
+    )
+    def wb_get_campaign(campaign_id: int) -> dict[str, Any]:
+        def query(session: Session) -> dict:
+            campaign = _campaign(session, campaign_id)
+            return {"campaign": campaign_detail(campaign), "review": campaign_review(session, campaign)}
+
+        return run(query)
+
+    @mcp.tool(
+        description=(
+            "用违禁词库检查一段文案（广告法极限词、功效夸大、诱导用语等）。返回是否通过、命中的词、级别、"
+            "位置和替换建议。must 级命中就算不通过。只检查，不保存。"
+        )
+    )
+    def wb_check_compliance(text: str) -> dict[str, Any]:
+        if len(text or "") > 50000:
+            raise ToolFailure("文字太长，最多 5 万字")
+        return run(lambda session: check_text(session, text or ""))
+
+    @mcp.tool(
+        description=(
+            "查商品资料卡：卖点、参数、常见问题、是否需要安装，以及各店铺同编码商品的售价和库存。"
+            "传 product_code 精确查；或传 q 按名称/编码模糊找（最多 10 个）。写文案、回复客户前先查它。"
+        )
+    )
+    def wb_get_product_card(product_code: str | None = None, q: str | None = None) -> dict[str, Any]:
+        if not (product_code and product_code.strip()) and not (q and q.strip()):
+            raise ToolFailure("请提供 product_code 或 q")
+
+        def query(session: Session) -> dict:
+            if product_code and product_code.strip():
+                card = session.scalar(select(ProductCard).where(ProductCard.product_code == product_code.strip()))
+                if card is None:
+                    raise AppError(404, "product_card_not_found", "这个商品编码还没有资料卡")
+                return {"items": [card_out(session, card)]}
+            return {"items": list_cards(brand=None, q=q, session=session)[:10]}
+
+        return run(query)
+
+    @mcp.tool(
+        description="查某个品牌的品牌规范：语气、品牌色、字体、Logo 用法和其他注意事项。写文案和设计需求前先查它。"
+    )
+    def wb_get_brand_guide(brand: str) -> dict[str, Any]:
+        return run(lambda session: get_guide(brand=brand or "", session=session))
 
     return mcp
 

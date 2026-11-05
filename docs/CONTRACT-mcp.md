@@ -1,4 +1,4 @@
-# 电商助手 MCP 工具约定（C03）
+# 工作台 MCP 工具约定（C03、C04）
 
 - 服务名：`hermes-workbench`
 - HTTP：随后端一起启动，`http://127.0.0.1:8000/mcp`（Streamable HTTP，无状态，JSON 响应）。只接受 Host 为 `127.0.0.1` / `localhost` 的请求，其他 Host 返回 421。
@@ -17,6 +17,13 @@
 | `wb_list_alerts` | `status`=open、`level`、`shop_id`、`limit`=20（最多 50） | `{total, returned, items: AlertOut[]}` | `GET /api/alerts` |
 | `wb_get_daily_report` | `date`（默认昨天，北京时间） | 同 `GET /api/reports/daily` | `GET /api/reports/daily` |
 | `wb_add_note` | `issue_id`、`note`（1–500 字） | 更新后的 `IssueOut` | — |
+| `wb_list_campaigns` | `date_from`、`date_to`、`brand`、`status` | `{items: 活动[]}` | `GET /api/campaigns` |
+| `wb_get_campaign` | `campaign_id` | `{campaign: 详情含任务, review: 复盘}` | `GET /api/campaigns/{id}` + `/review` |
+| `wb_check_compliance` | `text`（最多 5 万字） | 同 `POST /api/compliance/check` | `POST /api/compliance/check` |
+| `wb_get_product_card` | `product_code` 精确，或 `q` 模糊（最多 10 个） | `{items: 资料卡[]}` | `GET /api/product-cards` |
+| `wb_get_brand_guide` | `brand` | 品牌规范 | `GET /api/brand-guides/{brand}` |
+
+后 5 个（C04）给品牌助手用，全部只读；字段见 [CONTRACT-brand.md](CONTRACT-brand.md)。
 
 `IssueOut`、`AlertOut`、总览、趋势的字段见 [CONTRACT-products.md](CONTRACT-products.md) 和 [CONTRACT-overview.md](CONTRACT-overview.md)。
 
@@ -27,4 +34,4 @@
 
 ## 故意不做成工具的
 
-改问题或提醒的状态、改规则和投放规则、导入表格、发送日报、改价。这些都由人在工作台里操作。测试 `test_tool_list_is_read_only_plus_note` 会在有人加了这类工具时失败。
+改问题或提醒的状态、改规则和投放规则、导入表格、发送日报、改价；新建或修改活动、任务、资料卡、品牌规范、违禁词。这些都由人在工作台里操作。测试 `test_tool_list_is_read_only_plus_note` 会在有人加了这类工具时失败。

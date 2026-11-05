@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.ad_rules import DEFAULT_AD_RULES
+from app.brand import seed_banned_words
 from app.models import AdRule, Rule
 from app.rules import DEFAULT_RULES
 
@@ -99,6 +100,7 @@ def init_db(engine: Engine, url: str) -> None:
     factory = make_session_factory(engine)
     with factory() as session:
         seed_rules(session)
+        seed_banned_words(session)
         session.commit()
 
 

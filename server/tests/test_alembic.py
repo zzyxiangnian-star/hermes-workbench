@@ -15,6 +15,11 @@ EXPECTED_TABLES = {
     "ad_spend",
     "ad_rules",
     "alerts",
+    "brand_guides",
+    "banned_words",
+    "product_cards",
+    "campaigns",
+    "campaign_tasks",
     "alembic_version",
 }
 

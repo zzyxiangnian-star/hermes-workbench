@@ -6,6 +6,17 @@ mcp_servers:
   hermes-workbench:
     # 工作台后端随 workbench-api 启动，只监听本机。
     url: http://127.0.0.1:8000/mcp
+    # 只给这个 Bot 用到的工具（Hermes 的 tools.include 白名单）。
+    tools:
+      include:
+        - wb_list_product_issues
+        - wb_get_product
+        - wb_get_overview
+        - wb_get_trend
+        - wb_list_alerts
+        - wb_get_daily_report
+        - wb_add_note
+        - wb_get_product_card
 
 agent:
   # 电商助手只查数据、写备注，不需要执行命令、操作浏览器、跑代码或改本地文件。

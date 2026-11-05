@@ -223,3 +223,108 @@ class Alert(Base):
     note: Mapped[str | None] = mapped_column(Text)
 
     shop: Mapped[Shop] = relationship()
+
+
+# ---- C04 品牌活动：资料与活动 ----
+
+CAMPAIGN_KINDS = ("holiday", "big_promo", "new_launch", "offline", "other")
+CAMPAIGN_STATUSES = ("planning", "running", "ended", "cancelled")
+TASK_KINDS = ("copy", "design", "ads", "member", "other")
+
+
+class BrandGuide(Base):
+    __tablename__ = "brand_guides"
+    __table_args__ = (UniqueConstraint("brand", name="uq_brand_guides_brand"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    brand: Mapped[str] = mapped_column(String(200), nullable=False)
+    tone: Mapped[str | None] = mapped_column(Text)
+    colors: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    fonts: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    logo_rules: Mapped[str | None] = mapped_column(Text)
+    notes: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class BannedWord(Base):
+    __tablename__ = "banned_words"
+    __table_args__ = (
+        UniqueConstraint("word", name="uq_banned_words_word"),
+        CheckConstraint("level IN ('must', 'warn')", name="ck_banned_words_level"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    word: Mapped[str] = mapped_column(String(100), nullable=False)
+    level: Mapped[str] = mapped_column(String(8), nullable=False)
+    category: Mapped[str] = mapped_column(String(50), nullable=False)
+    suggestion: Mapped[str | None] = mapped_column(String(200))
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+
+class ProductCard(Base):
+    __tablename__ = "product_cards"
+    __table_args__ = (UniqueConstraint("product_code", name="uq_product_cards_code"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    product_code: Mapped[str] = mapped_column(String(128), nullable=False)
+    brand: Mapped[str] = mapped_column(String(200), nullable=False)
+    name: Mapped[str] = mapped_column(String(500), nullable=False)
+    selling_points: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    specs: Mapped[str | None] = mapped_column(Text)
+    faq: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    install_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class Campaign(Base):
+    __tablename__ = "campaigns"
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('holiday', 'big_promo', 'new_launch', 'offline', 'other')",
+            name="ck_campaigns_kind",
+        ),
+        CheckConstraint(
+            "status IN ('planning', 'running', 'ended', 'cancelled')",
+            name="ck_campaigns_status",
+        ),
+        CheckConstraint("end_date >= start_date", name="ck_campaigns_dates"),
+        Index("ix_campaigns_dates", "start_date", "end_date"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    brand: Mapped[str] = mapped_column(String(200), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="planning")
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    goal: Mapped[str | None] = mapped_column(Text)
+    target_sales: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    budget: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
+    product_codes: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    tasks: Mapped[list["CampaignTask"]] = relationship(
+        back_populates="campaign", cascade="all, delete-orphan", order_by="CampaignTask.id"
+    )
+
+
+class CampaignTask(Base):
+    __tablename__ = "campaign_tasks"
+    __table_args__ = (
+        CheckConstraint("kind IN ('copy', 'design', 'ads', 'member', 'other')", name="ck_campaign_tasks_kind"),
+        Index("ix_campaign_tasks_campaign_id", "campaign_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    campaign_id: Mapped[int] = mapped_column(ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    owner: Mapped[str | None] = mapped_column(String(100))
+    due_date: Mapped[date | None] = mapped_column(Date)
+    done: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    note: Mapped[str | None] = mapped_column(Text)
+
+    campaign: Mapped[Campaign] = relationship(back_populates="tasks")
