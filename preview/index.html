@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hermes Workbench Preview (W01)</title>
+    <style>
+      /* CSS 变量抄自 hermes-agent: apps/desktop/src/styles.css 第 203-394 行、第 602-630 行 */
+      :root {
+        color-scheme: light;
+
+        --theme-foreground: #17171a;
+        --theme-primary: #0053fd;
+        --theme-midground: #0053fd;
+        --theme-background-seed: #f8faff;
+        --theme-sidebar-seed: #f3f7ff;
+        --theme-card-seed: #ffffff;
+        --theme-elevated-seed: #ffffff;
+        --theme-neutral-chrome: #f3f3f3;
+        --theme-neutral-sidebar: #f3f3f3;
+        --theme-neutral-card: #fcfcfc;
+        --theme-mix-chrome: 92%;
+        --theme-mix-sidebar: 100%;
+        --theme-mix-card: 22%;
+        --theme-mix-elevated: 28%;
+        --theme-fill-primary-accent-mix: 16%;
+        --theme-fill-secondary-accent-mix: 11%;
+        --theme-fill-tertiary-accent-mix: 8%;
+        --theme-fill-quaternary-accent-mix: 5%;
+        --theme-fill-quinary-accent-mix: 3%;
+        --theme-stroke-primary-accent-mix: 24%;
+        --theme-stroke-secondary-accent-mix: 16%;
+        --theme-stroke-tertiary-accent-mix: 10%;
+        --theme-stroke-quaternary-accent-mix: 6%;
+
+        --ui-base: var(--theme-foreground);
+        --ui-accent: var(--theme-midground);
+        --ui-bg-editor: color-mix(in srgb, var(--theme-card-seed) var(--theme-mix-card), var(--theme-neutral-card));
+        --ui-bg-elevated: color-mix(
+          in srgb,
+          var(--theme-elevated-seed) var(--theme-mix-elevated),
+          var(--theme-neutral-card)
+        );
+        --ui-bg-primary: color-mix(
+          in srgb,
+          var(--ui-accent) var(--theme-fill-primary-accent-mix),
+          color-mix(in srgb, var(--ui-base) 10%, transparent)
+        );
+        --ui-bg-secondary: color-mix(
+          in srgb,
+          var(--ui-accent) var(--theme-fill-secondary-accent-mix),
+          color-mix(in srgb, var(--ui-base) 7%, transparent)
+        );
+        --ui-bg-tertiary: color-mix(
+          in srgb,
+          var(--ui-accent) var(--theme-fill-tertiary-accent-mix),
+          color-mix(in srgb, var(--ui-base) 5%, transparent)
+        );
+        --ui-bg-quaternary: color-mix(
+          in srgb,
+          var(--ui-accent) var(--theme-fill-quaternary-accent-mix),
+          color-mix(in srgb, var(--ui-base) 4%, transparent)
+        );
+        --ui-bg-quinary: color-mix(
+          in srgb,
+          var(--ui-accent) var(--theme-fill-quinary-accent-mix),
+          color-mix(in srgb, var(--ui-base) 3%, transparent)
+        );
+        --ui-text-primary: color-mix(in srgb, var(--ui-base) 94%, transparent);
+        --ui-text-secondary: color-mix(in srgb, var(--ui-base) 74%, transparent);
+        --ui-text-tertiary: color-mix(in srgb, var(--ui-base) 54%, transparent);
+        --ui-text-quaternary: color-mix(in srgb, var(--ui-base) 36%, transparent);
+        --ui-stroke-primary: color-mix(
+          in srgb,
+          var(--ui-accent) var(--theme-stroke-primary-accent-mix),
+          color-mix(in srgb, var(--ui-base) 10%, transparent)
+        );
+        --ui-stroke-secondary: color-mix(
+          in srgb,
+          var(--ui-accent) var(--theme-stroke-secondary-accent-mix),
+          color-mix(in srgb, var(--ui-base) 7%, transparent)
+        );
+        --ui-stroke-tertiary: color-mix(
+          in srgb,
+          var(--ui-accent) var(--theme-stroke-tertiary-accent-mix),
+          color-mix(in srgb, var(--ui-base) 5%, transparent)
+        );
+      }
+
+      :root.dark {
+        color-scheme: dark;
+
+        --theme-foreground: #f4f4f6;
+        --theme-primary: #6366f1;
+        --theme-midground: #818cf8;
+        --theme-background-seed: #111217;
+        --theme-sidebar-seed: #0e0f14;
+        --theme-card-seed: #181920;
+        --theme-elevated-seed: #1f2029;
+        --theme-mix-chrome: 74%;
+        --theme-mix-card: 38%;
+        --theme-mix-elevated: 46%;
+        --theme-neutral-chrome: #0d0d0e;
+        --theme-neutral-sidebar: #0a0a0b;
+        --theme-neutral-card: #161618;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+      }
+
+      html,
+      body,
+      #root {
+        margin: 0;
+        height: 100%;
+        width: 100%;
+        font-family: "Segoe WPC", "Segoe UI", -apple-system, BlinkMacSystemFont, "SF Pro Text",
+          "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+        background-color: var(--ui-bg-editor);
+        color: var(--ui-text-primary);
+        -webkit-font-smoothing: antialiased;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>
