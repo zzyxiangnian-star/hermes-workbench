@@ -7,6 +7,11 @@ def test_health_rules_and_cors(client):
     assert health.json() == {"status": "ok"}
     allowed = client.get("/api/health", headers={"Origin": "http://127.0.0.1:5173"})
     assert allowed.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
+    localhost = client.get("/api/health", headers={"Origin": "http://localhost:4173"})
+    assert localhost.headers["access-control-allow-origin"] == "http://localhost:4173"
+    # Hermes 桌面版从 file:// 打开，浏览器把 Origin 标成 null。
+    null_origin = client.get("/api/health", headers={"Origin": "null"})
+    assert null_origin.headers["access-control-allow-origin"] == "null"
     blocked = client.get("/api/health", headers={"Origin": "https://example.com"})
     assert "access-control-allow-origin" not in blocked.headers
 

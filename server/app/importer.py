@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import re
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -12,8 +13,9 @@ import pandas as pd
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.ad_rules import run_ad_rules
 from app.errors import AppError
-from app.models import ImportRun, Product, Shop, utcnow
+from app.models import AdSpend, DailyMetric, ImportRun, Product, Shop, utcnow
 from app.rules import run_enabled_rules
 
 # 报表列名 → 字段。匹配前会去掉空白并转成小写。
@@ -36,6 +38,51 @@ FIELD_LABELS = {
     "product_code": "货号",
     "floor_price": "底价",
     "activity": "活动",
+}
+
+METRICS_ALIASES: dict[str, tuple[str, ...]] = {
+    "date": ("日期", "统计日期", "date", "时间"),
+    "visitors": ("访客", "访客数", "uv", "访客人数", "visitors"),
+    "orders": ("订单", "订单数", "成交订单数", "支付订单数", "orders"),
+    "sales_amount": ("销售额", "成交金额", "支付金额", "销售金额", "sales_amount"),
+    "refund_amount": ("退款金额", "退款", "成功退款金额", "refund_amount"),
+}
+METRICS_REQUIRED = ("date", "visitors", "orders", "sales_amount")
+METRICS_LABELS = {
+    "date": "日期",
+    "visitors": "访客",
+    "orders": "订单",
+    "sales_amount": "销售额",
+    "refund_amount": "退款金额",
+}
+
+AD_ALIASES: dict[str, tuple[str, ...]] = {
+    "date": ("日期", "统计日期", "date"),
+    "tool": ("工具", "投放工具", "推广工具", "渠道", "tool"),
+    "campaign": ("计划", "计划名称", "计划名", "推广计划", "campaign"),
+    "spend": ("花费", "消耗", "花费金额", "投放花费", "spend"),
+    "gmv": ("成交金额", "gmv", "投放成交", "推广成交金额", "直接成交金额"),
+    "clicks": ("点击", "点击量", "点击数", "clicks"),
+    "impressions": ("展现", "展现量", "曝光", "曝光量", "impressions"),
+}
+AD_REQUIRED = ("date", "tool", "campaign", "spend", "gmv")
+AD_LABELS = {
+    "date": "日期",
+    "tool": "投放工具",
+    "campaign": "计划",
+    "spend": "花费",
+    "gmv": "成交金额",
+    "clicks": "点击",
+    "impressions": "展现",
+}
+TOOL_NAMES = {
+    "万相台": "万相台",
+    "京准通": "京准通",
+    "多多推广": "多多推广",
+    "拼多多推广": "多多推广",
+    "巨量千川": "巨量千川",
+    "千川": "巨量千川",
+    "其他": "其他",
 }
 
 
@@ -73,6 +120,7 @@ def import_products(
     run = ImportRun(
         file_name=file_name or "upload",
         shop_id=shop_id,
+        kind="products",
         rows_ok=rows_ok,
         rows_failed=len(errors),
         errors=errors,
@@ -105,7 +153,17 @@ def read_table(file_name: str, content: bytes) -> pd.DataFrame:
     return frame
 
 
-def resolve_columns(columns: list[object], mapping: dict[str, str] | None) -> dict[str, str]:
+def resolve_columns(
+    columns: list[object],
+    mapping: dict[str, str] | None,
+    *,
+    aliases: dict[str, tuple[str, ...]] | None = None,
+    required: tuple[str, ...] | None = None,
+    labels: dict[str, str] | None = None,
+) -> dict[str, str]:
+    aliases = aliases or FIELD_ALIASES
+    required = REQUIRED_FIELDS if required is None else required
+    labels = labels or FIELD_LABELS
     by_norm = {norm_header(column): str(column) for column in columns}
     assigned: dict[str, str] = {}
     used: set[str] = set()
@@ -113,28 +171,28 @@ def resolve_columns(columns: list[object], mapping: dict[str, str] | None) -> di
         if not isinstance(mapping, dict):
             raise AppError(400, "invalid_mapping", "mapping 必须是 JSON 对象")
         for raw_name, field in mapping.items():
-            if field not in FIELD_ALIASES:
+            if field not in aliases:
                 raise AppError(400, "invalid_mapping", f"mapping 里的字段「{field}」不能识别")
             key = norm_header(raw_name)
             column = by_norm.get(key)
             if column is None:
                 raise AppError(400, "invalid_mapping", f"列「{raw_name}」不在表头里")
             if field in assigned and assigned[field] != column:
-                raise AppError(400, "invalid_mapping", f"字段「{FIELD_LABELS[field]}」对应了多列")
+                raise AppError(400, "invalid_mapping", f"字段「{labels[field]}」对应了多列")
             if column in used and assigned.get(field) != column:
                 raise AppError(400, "invalid_mapping", f"列「{column}」对应了多个字段")
             assigned[field] = column
             used.add(column)
-    for field, aliases in FIELD_ALIASES.items():
+    for field, names in aliases.items():
         if field in assigned:
             continue
-        for alias in aliases:
+        for alias in names:
             column = by_norm.get(norm_header(alias))
             if column and column not in used:
                 assigned[field] = column
                 used.add(column)
                 break
-    missing = [FIELD_LABELS[field] for field in REQUIRED_FIELDS if field not in assigned]
+    missing = [labels[field] for field in required if field not in assigned]
     if missing:
         names = "、".join(missing)
         raise AppError(400, "column_unrecognized", f"无法识别{names}列，请传入 mapping")
@@ -287,3 +345,218 @@ def _suffix(file_name: str) -> str:
     if lowered.endswith(".csv"):
         return ".csv"
     return ""
+
+
+def import_metrics(
+    session: Session,
+    *,
+    shop_id: int,
+    file_name: str,
+    content: bytes,
+    mapping: dict[str, str] | None = None,
+) -> ImportRun:
+    _require_shop(session, shop_id)
+    frame = read_table(file_name, content)
+    columns = resolve_columns(
+        list(frame.columns),
+        mapping,
+        aliases=METRICS_ALIASES,
+        required=METRICS_REQUIRED,
+        labels=METRICS_LABELS,
+    )
+    errors: list[dict[str, Any]] = []
+    rows_ok = 0
+    for offset, record in enumerate(frame.to_dict(orient="records")):
+        if _row_blank(record):
+            continue
+        row_number = offset + 2
+        try:
+            values = _parse_metric_row(record, columns)
+        except ValueError as exc:
+            errors.append({"row": row_number, "reason": str(exc)})
+            continue
+        _upsert_metric(session, shop_id, values)
+        rows_ok += 1
+    return _finish_run(session, file_name, shop_id, "metrics", rows_ok, errors)
+
+
+def import_ad_spend(
+    session: Session,
+    *,
+    shop_id: int,
+    file_name: str,
+    content: bytes,
+    mapping: dict[str, str] | None = None,
+) -> tuple[ImportRun, dict[str, int]]:
+    _require_shop(session, shop_id)
+    frame = read_table(file_name, content)
+    columns = resolve_columns(
+        list(frame.columns),
+        mapping,
+        aliases=AD_ALIASES,
+        required=AD_REQUIRED,
+        labels=AD_LABELS,
+    )
+    errors: list[dict[str, Any]] = []
+    rows_ok = 0
+    for offset, record in enumerate(frame.to_dict(orient="records")):
+        if _row_blank(record):
+            continue
+        row_number = offset + 2
+        try:
+            values = _parse_ad_row(record, columns)
+        except ValueError as exc:
+            errors.append({"row": row_number, "reason": str(exc)})
+            continue
+        _upsert_ad_spend(session, shop_id, values)
+        rows_ok += 1
+    session.flush()
+    run = _finish_run(session, file_name, shop_id, "ad_spend", rows_ok, errors)
+    stats = run_ad_rules(session)
+    return run, stats
+
+
+def _require_shop(session: Session, shop_id: int) -> Shop:
+    shop = session.get(Shop, shop_id)
+    if shop is None:
+        raise AppError(404, "shop_not_found", "店铺不存在")
+    return shop
+
+
+def _finish_run(
+    session: Session,
+    file_name: str,
+    shop_id: int,
+    kind: str,
+    rows_ok: int,
+    errors: list[dict[str, Any]],
+) -> ImportRun:
+    session.flush()
+    run = ImportRun(
+        file_name=file_name or "upload",
+        shop_id=shop_id,
+        kind=kind,
+        rows_ok=rows_ok,
+        rows_failed=len(errors),
+        errors=errors,
+        created_at=utcnow(),
+    )
+    session.add(run)
+    session.flush()
+    return run
+
+
+def _parse_metric_row(record: dict, columns: dict[str, str]) -> dict[str, Any]:
+    refund_raw = _cell(record, columns.get("refund_amount"))
+    return {
+        "date": _parse_date(_cell(record, columns.get("date"))),
+        "visitors": _parse_whole(_cell(record, columns.get("visitors")), "访客"),
+        "orders": _parse_whole(_cell(record, columns.get("orders")), "订单"),
+        "sales_amount": _parse_price(_cell(record, columns.get("sales_amount")), "销售额"),
+        "refund_amount": None if _is_blank(refund_raw) else _parse_price(refund_raw, "退款金额"),
+    }
+
+
+def _parse_ad_row(record: dict, columns: dict[str, str]) -> dict[str, Any]:
+    clicks_raw = _cell(record, columns.get("clicks"))
+    impressions_raw = _cell(record, columns.get("impressions"))
+    return {
+        "date": _parse_date(_cell(record, columns.get("date"))),
+        "tool": _parse_tool(_cell(record, columns.get("tool"))),
+        "campaign": _required_text(_cell(record, columns.get("campaign")), 200, "计划"),
+        "spend": _parse_price(_cell(record, columns.get("spend")), "花费"),
+        "gmv": _parse_price(_cell(record, columns.get("gmv")), "成交金额"),
+        "clicks": None if _is_blank(clicks_raw) else _parse_whole(clicks_raw, "点击"),
+        "impressions": None if _is_blank(impressions_raw) else _parse_whole(impressions_raw, "展现"),
+    }
+
+
+def _upsert_metric(session: Session, shop_id: int, values: dict[str, Any]) -> None:
+    row = session.scalar(
+        select(DailyMetric).where(DailyMetric.shop_id == shop_id, DailyMetric.date == values["date"])
+    )
+    if row is None:
+        row = DailyMetric(shop_id=shop_id, date=values["date"], updated_at=utcnow())
+        session.add(row)
+    row.visitors = values["visitors"]
+    row.orders = values["orders"]
+    row.sales_amount = values["sales_amount"]
+    row.refund_amount = values["refund_amount"]
+    row.updated_at = utcnow()
+
+
+def _upsert_ad_spend(session: Session, shop_id: int, values: dict[str, Any]) -> None:
+    row = session.scalar(
+        select(AdSpend).where(
+            AdSpend.shop_id == shop_id,
+            AdSpend.date == values["date"],
+            AdSpend.tool == values["tool"],
+            AdSpend.campaign == values["campaign"],
+        )
+    )
+    if row is None:
+        row = AdSpend(
+            shop_id=shop_id,
+            date=values["date"],
+            tool=values["tool"],
+            campaign=values["campaign"],
+            updated_at=utcnow(),
+        )
+        session.add(row)
+    row.spend = values["spend"]
+    row.gmv = values["gmv"]
+    row.clicks = values["clicks"]
+    row.impressions = values["impressions"]
+    row.updated_at = utcnow()
+
+
+def _parse_date(value: object) -> date:
+    if _is_blank(value):
+        raise ValueError("缺少日期")
+    text = str(value).strip().replace("/", "-").replace(".", "-")
+    text = text.split(" ", 1)[0].split("T", 1)[0]
+    parts = text.split("-")
+    if len(parts) != 3:
+        raise ValueError("日期格式不正确")
+    try:
+        return date(int(parts[0]), int(parts[1]), int(parts[2]))
+    except ValueError as exc:
+        raise ValueError("日期格式不正确") from exc
+
+
+def _parse_tool(value: object) -> str:
+    text = _text(value)
+    if not text:
+        raise ValueError("缺少投放工具")
+    name = TOOL_NAMES.get(text)
+    if name is None:
+        raise ValueError("投放工具无法识别")
+    return name
+
+
+def _required_text(value: object, limit: int, label: str) -> str:
+    text = _text(value)
+    if not text:
+        raise ValueError(f"缺少{label}")
+    if len(text) > limit:
+        raise ValueError(f"{label}过长")
+    return text
+
+
+def _parse_whole(value: object, label: str) -> int:
+    if _is_blank(value):
+        raise ValueError(f"{label}为空")
+    text = str(value).strip().replace(",", "").replace("，", "")
+    if text.endswith(".0"):
+        text = text[:-2]
+    try:
+        number = Decimal(text)
+    except InvalidOperation as exc:
+        raise ValueError(f"{label}不是整数") from exc
+    if number != number.to_integral_value():
+        raise ValueError(f"{label}不是整数")
+    if number < 0:
+        raise ValueError(f"{label}不能为负数")
+    if number > 1_000_000_000:
+        raise ValueError(f"{label}过大")
+    return int(number)

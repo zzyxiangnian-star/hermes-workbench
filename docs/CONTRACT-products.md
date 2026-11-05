@@ -1,6 +1,6 @@
 # 商品接口约定
 
-给 Antigravity 接「商品」页用。后端只听 `127.0.0.1:8000`，所有路径以 `/api` 开头，请求和响应都是 JSON。浏览器来源只放行 `http://localhost` 和 `http://127.0.0.1`（端口不限）。
+给 Antigravity 接「商品」页用。后端只听 `127.0.0.1:8000`，所有路径以 `/api` 开头，请求和响应都是 JSON。浏览器来源放行 `http://localhost` 和 `http://127.0.0.1`（端口不限），以及 Origin 为 `null` 的 Hermes 桌面版（界面从 `file://` 打开）。还要放行别的来源时，设置环境变量 `WB_ALLOWED_ORIGINS`，多个地址用逗号分隔。其他来源不返回 `Access-Control-Allow-Origin`。
 
 金额是数字，时间是 UTC，形如 `2026-11-05T08:35:55.973510+00:00`。下面的例子来自本机导入两张样表后的真实返回，时间会随运行变化。
 
@@ -198,7 +198,7 @@
 | `below_floor` | 售价低于底价。底价为空不算 | 无 |
 | `cross_shop_gap` | 同一货号在不同店铺的最低价和最高价之差，超过最低价的百分比。等于上限不算 | `max_gap_pct`，默认 5 |
 | `low_stock` | 库存小于最低库存。等于不算 | `min_stock`，默认 10 |
-| `missing_activity` | `required_activity` 非空，且商品当前活动不是它 | `required_activity`，默认空，空着时这条不命中 |
+| `missing_activity` | `required_activity` 非空，且把活动按 `,` `，` `、` `/` 拆开后不包含这个名字 | `required_activity`，默认空，空着时这条不命中 |
 
 `PATCH /api/rules/{id}` 只改 `params` 和 `enabled`。`params` 按该规则的字段整份提交，缺的键用默认值。
 
@@ -239,6 +239,7 @@
   "id": 1,
   "file_name": "products-tmall.xlsx",
   "shop_id": 1,
+  "kind": "products",
   "rows_ok": 28,
   "rows_failed": 2,
   "errors": [
@@ -252,6 +253,8 @@
 
 店铺不存在是 `404`，`code` 为 `shop_not_found`。文件不是 xlsx/csv 是 `400`，`code` 为 `unsupported_file`。
 
+`kind` 用来区分导入类型：`products`、`metrics`、`ad_spend`。商品导入固定是 `products`。
+
 `GET /api/import/runs` 按 id 从新到旧。列表里的 `rules` 是 `null`（检查结果只在当次导入响应里）。
 
 ```json
@@ -259,6 +262,7 @@
   "id": 2,
   "file_name": "products-jd.csv",
   "shop_id": 2,
+  "kind": "products",
   "rows_ok": 28,
   "rows_failed": 2,
   "errors": [

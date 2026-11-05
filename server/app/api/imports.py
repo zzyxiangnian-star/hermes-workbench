@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.importer import import_products, parse_mapping
+from app.importer import import_ad_spend, import_metrics, import_products, parse_mapping
 from app.models import ImportRun
 from app.schemas import ImportRunOut, RuleRunOut
 
@@ -28,6 +28,42 @@ async def upload_products(
     return _run_out(run, stats)
 
 
+@router.post("/import/metrics", response_model=ImportRunOut)
+async def upload_metrics(
+    shop_id: int = Form(...),
+    mapping: str | None = Form(None),
+    file: UploadFile = File(...),
+    session: Session = Depends(get_db),
+) -> ImportRunOut:
+    content = await file.read()
+    run = import_metrics(
+        session,
+        shop_id=shop_id,
+        file_name=file.filename or "upload",
+        content=content,
+        mapping=parse_mapping(mapping),
+    )
+    return _run_out(run, None)
+
+
+@router.post("/import/ad-spend", response_model=ImportRunOut)
+async def upload_ad_spend(
+    shop_id: int = Form(...),
+    mapping: str | None = Form(None),
+    file: UploadFile = File(...),
+    session: Session = Depends(get_db),
+) -> ImportRunOut:
+    content = await file.read()
+    run, stats = import_ad_spend(
+        session,
+        shop_id=shop_id,
+        file_name=file.filename or "upload",
+        content=content,
+        mapping=parse_mapping(mapping),
+    )
+    return _run_out(run, stats)
+
+
 @router.get("/import/runs", response_model=list[ImportRunOut])
 def list_runs(session: Session = Depends(get_db)) -> list[ImportRunOut]:
     runs = session.scalars(select(ImportRun).order_by(ImportRun.id.desc())).all()
@@ -39,6 +75,7 @@ def _run_out(run: ImportRun, stats: dict | None) -> ImportRunOut:
         id=run.id,
         file_name=run.file_name,
         shop_id=run.shop_id,
+        kind=run.kind,
         rows_ok=run.rows_ok,
         rows_failed=run.rows_failed,
         errors=run.errors,

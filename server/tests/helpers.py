@@ -16,11 +16,15 @@ def create_shop(client, platform="tmall", name="星年天猫旗舰店", brand="�
 
 
 def upload(client, shop_id, filename, content: bytes, mapping=None):
+    return upload_to(client, "/api/import/products", shop_id, filename, content, mapping)
+
+
+def upload_to(client, path, shop_id, filename, content: bytes, mapping=None):
     data = {"shop_id": str(shop_id)}
     if mapping is not None:
         data["mapping"] = json.dumps(mapping, ensure_ascii=False)
     return client.post(
-        "/api/import/products",
+        path,
         data=data,
         files={"file": (filename, content, "application/octet-stream")},
     )

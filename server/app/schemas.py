@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Annotated, Any, Literal
 
@@ -154,6 +154,7 @@ class ImportRunOut(APIModel):
     id: int
     file_name: str
     shop_id: int
+    kind: str
     rows_ok: int
     rows_failed: int
     errors: list[ImportErrorItem]
@@ -163,3 +164,119 @@ class ImportRunOut(APIModel):
 
 class HealthOut(BaseModel):
     status: str = Field(examples=["ok"])
+
+
+class MetricCompare(BaseModel):
+    value: float | int | None
+    previous: float | int | None
+    change: float | None
+
+
+class OverviewMetrics(BaseModel):
+    visitors: MetricCompare
+    orders: MetricCompare
+    sales_amount: MetricCompare
+    conversion_rate: MetricCompare
+    avg_order_value: MetricCompare
+    ad_spend: MetricCompare
+    ad_gmv: MetricCompare
+    roi: MetricCompare
+
+
+class OverviewOut(BaseModel):
+    date: date
+    compare_date: date
+    shop_id: int | None
+    brand: str | None
+    open_alerts: int
+    metrics: OverviewMetrics
+
+
+class TrendPoint(BaseModel):
+    date: date
+    value: float | int | None
+
+
+class TrendOut(BaseModel):
+    metric: str
+    days: int
+    shop_id: int | None
+    points: list[TrendPoint]
+
+
+class AdSpendOut(BaseModel):
+    shop_id: int
+    shop_name: str
+    tool: str
+    campaign: str
+    spend: float
+    gmv: float
+    roi: float | None
+    has_alert: bool
+
+
+class AlertOut(APIModel):
+    id: int
+    kind: str
+    level: str
+    shop_id: int
+    shop_name: str
+    tool: str | None
+    campaign: str | None
+    date: date
+    message: str
+    status: str
+    found_at: UtcDateTime
+    resolved_at: UtcDateTime | None
+    note: str | None
+
+
+class AlertPatch(BaseModel):
+    status: IssueStatus | None = None
+    note: str | None = None
+
+    @field_validator("note")
+    @classmethod
+    def strip_note(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        text = value.strip()
+        return text or None
+
+
+class AlertShopCount(BaseModel):
+    shop_id: int
+    name: str
+    platform: str
+    brand: str
+    open_count: int
+
+
+class AlertSummary(BaseModel):
+    shops: list[AlertShopCount]
+    total_open: int
+
+
+class AbnormalShop(BaseModel):
+    shop_id: int
+    name: str
+    platform: str
+    brand: str
+    open_count: int
+
+
+class DailyReportOut(BaseModel):
+    date: date
+    markdown: str
+    overview: OverviewOut
+    abnormal_shops: list[AbnormalShop]
+    open_issue_count: int
+    alerts: list[AlertOut]
+
+
+class DailySendOut(BaseModel):
+    date: date
+    dry_run: bool
+    sent: bool
+    targets: list[str]
+    markdown: str

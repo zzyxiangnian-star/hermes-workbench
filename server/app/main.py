@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -13,6 +14,7 @@ from fastapi.responses import JSONResponse
 from app.api import api_router
 from app.db import default_database_url, init_db, make_engine, make_session_factory
 from app.errors import AppError, error_body
+from app.scheduler import start_scheduler
 
 logger = logging.getLogger("workbench")
 
@@ -26,16 +28,25 @@ _VALIDATION_MESSAGES = {
     "status": "状态必须是 open、resolved 或 ignored",
     "level": "级别必须是 must 或 warn",
     "file": "请上传表格文件",
+    "days": "天数必须在 1 到 366 之间",
+    "date": "日期格式应为 YYYY-MM-DD",
+    "metric": "请指定指标",
 }
 
 
 def create_app(database_url: str | None = None) -> FastAPI:
-    engine = make_engine(database_url or default_database_url())
-    app = FastAPI(title="Hermes 工作台商品接口", version="0.1.0", lifespan=_lifespan)
+    url = database_url or default_database_url()
+    engine = make_engine(url)
+    app = FastAPI(title="Hermes 工作台商品接口", version="0.2.0", lifespan=_lifespan)
     app.state.engine = engine
+    app.state.database_url = url
     app.state.session_factory = make_session_factory(engine)
+    app.state.scheduler = None
+    extra = [item.strip() for item in os.environ.get("WB_ALLOWED_ORIGINS", "").split(",") if item.strip()]
     app.add_middleware(
         CORSMiddleware,
+        # Hermes 桌面版从 file:// 打开，Origin 是字符串 null。
+        allow_origins=["null", *extra],
         allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
         allow_credentials=True,
         allow_methods=["*"],
@@ -51,8 +62,14 @@ def create_app(database_url: str | None = None) -> FastAPI:
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    init_db(app.state.engine)
-    yield
+    init_db(app.state.engine, app.state.database_url)
+    scheduler = start_scheduler(app.state.session_factory)
+    app.state.scheduler = scheduler
+    try:
+        yield
+    finally:
+        if scheduler is not None:
+            scheduler.shutdown(wait=False)
 
 
 async def _app_error(_request: Request, exc: AppError) -> JSONResponse:

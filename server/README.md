@@ -21,9 +21,13 @@ cd server
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-也可以 `python -m app.main`，同样只绑 `127.0.0.1:8000`。第一次启动会写入四条默认规则。浏览器来源只放行 `localhost` 和 `127.0.0.1`。
+也可以 `python -m app.main`，同样只绑 `127.0.0.1:8000`。第一次启动会写入四条商品规则和三条投放规则。表结构由 Alembic 管：空库启动时会 `upgrade head`。已经用旧版 `create_all` 建过、又没有版本记录的本地库，会先标到 `c01` 再升级。
 
-接口说明在仓库的 `docs/CONTRACT-products.md`。
+浏览器来源放行 `localhost`、`127.0.0.1`（端口不限）和 Origin `null`。额外来源用 `WB_ALLOWED_ORIGINS`（逗号分隔）。
+
+每天 `WB_DAILY_AT`（默认 `08:30`，上海时区）跑商品规则、投放规则，再生成昨天的日报。配了 `WB_FEISHU_WEBHOOK` 或 `WB_WECOM_WEBHOOK` 才推送。`WB_SCHEDULER=off` 关掉定时任务。
+
+接口说明在 `docs/CONTRACT-products.md` 和 `docs/CONTRACT-overview.md`。
 
 ## 导入样表
 

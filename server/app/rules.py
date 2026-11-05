@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.errors import AppError
@@ -159,18 +160,24 @@ def _low_stock(session: Session, min_stock: int) -> dict[int, str]:
     return {product.id: f"库存 {product.stock} 低于最低库存 {min_stock}" for product in rows}
 
 
+_ACTIVITY_SPLIT = re.compile(r"[,，、/]")
+
+
+def activity_names(value: str | None) -> set[str]:
+    if not value:
+        return set()
+    return {part.strip() for part in _ACTIVITY_SPLIT.split(value) if part.strip()}
+
+
 def _missing_activity(session: Session, required: str | None) -> dict[int, str]:
     if not required:
         return {}
-    rows = session.scalars(
-        select(Product).where(
-            or_(
-                Product.activity.is_(None),
-                func.trim(Product.activity) != required,
-            )
-        )
-    ).all()
-    return {product.id: f"未报名活动「{required}」" for product in rows}
+    rows = session.scalars(select(Product)).all()
+    return {
+        product.id: f"未报名活动「{required}」"
+        for product in rows
+        if required not in activity_names(product.activity)
+    }
 
 
 def _cross_shop_gap(session: Session, max_gap_pct: Decimal) -> dict[int, str]:

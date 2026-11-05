@@ -110,6 +110,30 @@ def test_missing_activity_hit_miss_and_no_duplicate(client):
     assert [item["sku"] for item in issues(client, status="open")] == ["OTHER"]
 
 
+def test_missing_activity_matches_any_listed_name(client):
+    shop = create_shop(client)
+    response = upload(
+        client,
+        shop["id"],
+        "multi.csv",
+        table(
+            ("A", "1", "英文逗号", 100, 50, 20, "双11,百亿补贴"),
+            ("B", "2", "中文逗号", 100, 50, 20, "双11，百亿补贴"),
+            ("C", "3", "顿号", 100, 50, 20, "双11、百亿补贴"),
+            ("D", "4", "斜杠", 100, 50, 20, "双11/百亿补贴"),
+            ("E", "5", "带空格", 100, 50, 20, "双11, 百亿补贴"),
+            ("F", "6", "只有别的", 100, 50, 20, "春季上新"),
+            ("G", "7", "前缀不算", 100, 50, 20, "双11预热"),
+        ),
+    )
+    assert response.status_code == 200, response.text
+    rule = rule_by_kind(client, "missing_activity")
+    patched = client.patch(f"/api/rules/{rule['id']}", json={"params": {"required_activity": "双11"}})
+    assert patched.status_code == 200, patched.text
+    assert client.post("/api/rules/run").json()["opened"] == 2
+    assert {item["sku"] for item in issues(client, status="open")} == {"F", "G"}
+
+
 def test_ignored_issue_is_not_reopened_until_it_clears(client):
     shop = create_shop(client)
     upload(client, shop["id"], "a.csv", table(("LOW", "F1", "低于底价", 189, 199, 20, "日常")))

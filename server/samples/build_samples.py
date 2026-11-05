@@ -1,8 +1,9 @@
-"""生成两张假数据样表。运行：python samples/build_samples.py"""
+"""生成假数据样表。运行：python samples/build_samples.py"""
 
 from __future__ import annotations
 
 import csv
+from datetime import date, timedelta
 from pathlib import Path
 
 from openpyxl import Workbook
@@ -115,9 +116,65 @@ def write_csv(path: Path, headers: list[str], rows: list[list]) -> None:
         writer.writerows(rows)
 
 
+METRICS_HEADERS = ["日期", "访客数", "订单数", "销售额", "退款金额"]
+AD_HEADERS = ["日期", "投放工具", "计划名称", "花费", "成交金额", "点击量", "展现量"]
+# 正常花费、正常成交、最后一天花费、最后一天成交。最后一天用来造低 ROI 和花费突增。
+AD_CAMPAIGNS = [
+    ("双11预热", 400, 1200, 500, 650),
+    ("日常测款", 100, 400, 100, 400),
+    ("爆发计划", 100, 300, 400, 800),
+    ("品牌词", 300, 900, 300, 900),
+]
+
+
+def _days() -> list[date]:
+    start = date(2026, 10, 6)
+    return [start + timedelta(days=offset) for offset in range(30)]
+
+
+def metrics_table() -> list[list]:
+    rows = []
+    for current in _days():
+        if current == date(2026, 11, 3):
+            visitors, orders, sales, refund = 1000, 40, 8000, 100
+        elif current == date(2026, 11, 4):
+            visitors, orders, sales, refund = 1200, 60, 12000, 300
+        elif current == date(2026, 10, 6):
+            visitors, orders, sales, refund = 1000, 50, 10000, ""
+        else:
+            visitors, orders, sales, refund = 1000, 50, 10000, 200
+        rows.append([current.isoformat(), visitors, orders, sales, refund])
+    rows.append(["", 10, 1, 100, 0])
+    rows.append(["2026-11-04", "很多", 1, 100, 0])
+    return rows
+
+
+def ad_spend_table() -> list[list]:
+    rows = []
+    for current in _days():
+        last = current == date(2026, 11, 4)
+        for name, spend, gmv, last_spend, last_gmv in AD_CAMPAIGNS:
+            rows.append(
+                [
+                    current.isoformat(),
+                    "万相台",
+                    name,
+                    last_spend if last else spend,
+                    last_gmv if last else gmv,
+                    20,
+                    1000,
+                ]
+            )
+    rows.append(["", "万相台", "坏计划", 10, 20, 1, 10])
+    rows.append(["2026-11-04", "万相台", "坏花费", "很多", 20, 1, 10])
+    return rows
+
+
 def main() -> None:
     write_xlsx(ROOT / "products-tmall.xlsx", TMALL_HEADERS, tmall_table())
     write_csv(ROOT / "products-jd.csv", JD_HEADERS, jd_table())
+    write_xlsx(ROOT / "metrics-tmall.xlsx", METRICS_HEADERS, metrics_table())
+    write_xlsx(ROOT / "ad-spend-tmall.xlsx", AD_HEADERS, ad_spend_table())
 
 
 if __name__ == "__main__":
