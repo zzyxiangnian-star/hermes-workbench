@@ -47,6 +47,9 @@ _VALIDATION_MESSAGES = {
     "planned_at": "计划日期格式应为 YYYY-MM-DD",
     "resolved": "请说明是否已解决",
     "url": "链接太长",
+    "appointment_at": "预约时间格式应为 YYYY-MM-DDTHH:MM",
+    "note": "备注不能为空，最多 1000 字",
+    "ids": "工单编号不正确",
 }
 
 

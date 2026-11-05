@@ -76,6 +76,7 @@ def build(db_path: Path) -> dict:
         _products(api, shops, rng)
         _metrics_and_ads(api, shops, rng, start, end)
         _brand(api, rng, end)
+        _orders(api, shops, rng, end)
         summary = {
             "数据库": str(db_path),
             "日期范围": f"{start} 至 {end}",
@@ -84,6 +85,7 @@ def build(db_path: Path) -> dict:
             "未处理投放提醒": len(api.get("/api/alerts", {"status": "open"})),
             "活动": len(api.get("/api/campaigns")),
             "稿件": len(api.get("/api/contents")),
+            "安装工单": len(api.get("/api/installs")),
         }
     return summary
 
@@ -331,6 +333,49 @@ def _brand(api: _Api, rng: random.Random, end: date) -> None:
             "variants": [{"platform": "douyin", "body": "直播口播：摸一下这个手感……"}],
         },
     )
+
+
+SURNAMES = "张王李赵刘陈杨黄周吴"
+CITIES = ["广东省深圳市南山区", "浙江省杭州市西湖区", "江苏省苏州市工业园区", "北京市朝阳区", "上海市浦东新区", "四川省成都市武侯区"]
+
+
+def _orders(api: _Api, shops: dict, rng: random.Random, end: date) -> None:
+    """最近 3 天的订单，空调、热水器会生成安装工单。手机号用 100 号段，不会是真号码。"""
+    header = ["订单编号", "付款时间", "商家编码", "货号", "商品标题", "购买数量", "实付金额", "收货人姓名", "联系手机", "收货地址", "买家留言", "订单状态"]
+    remarks = ["", "", "下午在家", "工作日晚上 7 点后", "老房子，墙比较旧", "先别装，等装修完"]
+    for platform, name, brand, _scale in SHOPS:
+        if brand != "星年":
+            continue
+        rows = [header]
+        prefix = platform.upper()[:2]
+        for n in range(14):
+            code, title, price, _floor, _install = XINGNIAN_PRODUCTS[rng.choice([0, 2, 4, 4, 5, 6, 7])]
+            day = end - timedelta(days=rng.randint(0, 2))
+            status = "交易关闭" if n == 13 else "买家已付款"
+            rows.append(
+                [
+                    f"{platform[:1].upper()}{day:%Y%m%d}{n:04d}",
+                    f"{day} {rng.randint(8, 23):02d}:{rng.randint(0, 59):02d}:00",
+                    f"{prefix}-{code}",
+                    code,
+                    title,
+                    1,
+                    price,
+                    rng.choice(SURNAMES) + rng.choice(["先生", "女士", "小明", "晓红"]),
+                    f"100{rng.randint(10000000, 99999999)}",
+                    f"{rng.choice(CITIES)}演示路 {rng.randint(1, 99)} 号",
+                    rng.choice(remarks),
+                    status,
+                ]
+            )
+        api.upload("/api/import/orders", shops[name]["id"], f"订单-{name}.csv", rows)
+    installs = api.get("/api/installs", {"status": "pending"})
+    if len(installs) >= 3:
+        first, second, third = installs[:3]
+        when = f"{end + timedelta(days=2)}T14:00:00+08:00"
+        api.post(f"/api/installs/{first['id']}/status", {"status": "booked", "appointment_at": when, "engineer": "刘师傅", "provider_ref": "ZMN-DEMO-1", "by": "客服小周"})
+        api.post(f"/api/installs/{second['id']}/status", {"status": "exception", "reason": "顾客说墙体是空心砖，需要先确认能否打孔", "by": "客服小周"})
+        api.post(f"/api/installs/{third['id']}/notes", {"note": "顾客要求带防尘罩", "by": "客服小周"})
 
 
 def main() -> None:

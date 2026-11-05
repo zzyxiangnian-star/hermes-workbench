@@ -1,4 +1,4 @@
-"""电商助手、品牌助手用的 MCP 工具。只读为主；写操作只有两个：给商品问题追加备注、新建稿件草稿。
+"""电商助手、品牌助手用的 MCP 工具。只读为主；写操作只有三个：给商品问题追加备注、给安装工单追加备注、新建稿件草稿。
 
 HTTP：随主服务挂在 /mcp（Streamable HTTP）。
 本地调试：python -m app.mcp_server --stdio
@@ -33,6 +33,9 @@ from app.api.alerts import list_alerts
 from app.api.brand_assets import card_out, get_guide, list_cards
 from app.api.campaigns import _campaign, campaign_detail, list_campaigns
 from app.api.contents import _content, content_detail, create_content, list_contents
+from app.api.installs import _install, get_install, install_out, install_summary, list_installs
+from app.installs import add_note as add_install_note
+from app.installs import mask_address, mask_name, mask_phone
 from app.brand_schemas import ContentIn
 from app.contents import compliance_of
 from app.api.issues import _issue_out, list_issues
@@ -49,7 +52,8 @@ MAX_ISSUES = 50
 MAX_NOTE = 500
 
 INSTRUCTIONS = (
-    "Hermes 工作台的数据。电商：商品问题、单个商品、经营总览、趋势、投放提醒、日报，可给商品问题追加备注。"
+    "Hermes 工作台的数据。电商：商品问题、单个商品、经营总览、趋势、投放提醒、日报、安装工单（顾客信息已打码），"
+    "可给商品问题和安装工单追加备注。"
     "品牌活动：活动日历和复盘、违禁词检查、商品资料卡、品牌规范、稿件，可把文案存成新草稿。"
     "不能改状态、改规则、导入数据、发日报、改价，不能送审、通过或发布稿件，也不能新建或修改活动和资料。"
 )
@@ -381,7 +385,67 @@ def build_mcp(session_factory: sessionmaker) -> Any:
 
         return run(write)
 
+    # ---- C07 安装工单（顾客信息打码后才给 AI）----
+
+    @mcp.tool(
+        description=(
+            "列出安装工单。状态：pending 待预约 / booked 已预约 / done 已完工 / exception 异常 / cancelled 已取消；"
+            "overdue=true 只看超过 48 小时还没预约的。顾客姓名、手机、地址已打码。最多 50 条。"
+        )
+    )
+    def wb_list_installs(
+        status: str | None = None,
+        shop_id: int | None = None,
+        overdue: bool | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        size = max(1, min(int(limit), MAX_ISSUES))
+
+        def query(session: Session) -> dict:
+            items = list_installs(status=status, shop_id=shop_id, q=None, overdue=overdue, session=session)
+            summary = install_summary(shop_id=shop_id, session=session)
+            return {"summary": summary, "total": len(items), "items": [_masked(item) for item in items[:size]]}
+
+        return run(query)
+
+    @mcp.tool(
+        description="查一张安装工单：订单、商品、买家留言、预约信息、异常原因、处理记录。顾客姓名、手机、地址已打码。"
+    )
+    def wb_get_install(install_id: int) -> dict[str, Any]:
+        return run(lambda session: _masked(get_install(install_id=install_id, session=session)))
+
+    @mcp.tool(
+        description=(
+            "给安装工单追加一条备注（例如读懂买家留言后的提醒、异常单的说明）。"
+            f"会加“{NOTE_PREFIX.strip()}”前缀，不改工单状态。单次最多 {MAX_NOTE} 字。"
+        )
+    )
+    def wb_add_install_note(install_id: int, note: str) -> dict[str, Any]:
+        text = (note or "").strip()
+        if not text:
+            raise ToolFailure("备注不能为空")
+        if len(text) > MAX_NOTE:
+            raise ToolFailure(f"备注最多 {MAX_NOTE} 字")
+
+        def write(session: Session) -> Any:
+            item = _install(session, install_id)
+            add_install_note(item, "电商助手", NOTE_PREFIX + text)
+            session.flush()
+            return _masked({**install_out(session, item), "events": item.events})
+
+        return run(write)
+
     return mcp
+
+
+def _masked(item: dict) -> dict:
+    """工单发给模型前把顾客信息打码。工作台页面上仍是完整信息。"""
+    return {
+        **item,
+        "buyer_name": mask_name(item.get("buyer_name")),
+        "phone": mask_phone(item.get("phone")),
+        "address": mask_address(item.get("address")),
+    }
 
 
 def _short_error(error: dict) -> str:

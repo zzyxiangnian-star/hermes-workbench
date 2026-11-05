@@ -18,11 +18,11 @@ D:\工作台报表\
   星年京东自营店\  ...
 ```
 
-按表头自动认出是商品、经营还是投放表。每 `WB_IMPORT_EVERY` 分钟（默认 10，0 表示只在早报前扫一次）扫一遍，早报前也会先扫一遍。导入成功的移到该店铺下的 `已导入\`（有坏行时旁边放一份 `.原因.txt`），失败的移到 `失败\` 并写明原因。刚放进去不到 10 秒的文件下一轮再导，避免读到写了一半的文件。也可以手动触发：`POST /api/import/folder/scan`；`GET /api/import/folder` 看是否启用。
+按表头自动认出是商品、经营、投放还是订单表。每 `WB_IMPORT_EVERY` 分钟（默认 10，0 表示只在早报前扫一次）扫一遍，早报前也会先扫一遍。导入成功的移到该店铺下的 `已导入\`（有坏行时旁边放一份 `.原因.txt`），失败的移到 `失败\` 并写明原因。刚放进去不到 10 秒的文件下一轮再导，避免读到写了一半的文件。也可以手动触发：`POST /api/import/folder/scan`；`GET /api/import/folder` 看是否启用。
 
 ## 演示数据
 
-`python -m app.demo`（或 `workbench-demo`）写到 `data/demo.db`，`--db` 可换路径。4 个店铺（星年天猫、京东、拼多多，木屿抖音）、30 天经营和投放、约 20 条商品问题、昨天的 3 条投放提醒、品牌规范、4 张商品资料卡、3 个活动（已结束可复盘 / 进行中 / 即将开始）、4 篇稿件（已发布、送审中、被退回、品牌助手写的含违禁词草稿）。
+`python -m app.demo`（或 `workbench-demo`）写到 `data/demo.db`，`--db` 可换路径。4 个店铺（星年天猫、京东、拼多多，木屿抖音）、30 天经营和投放、约 20 条商品问题、昨天的 3 条投放提醒、品牌规范、4 张商品资料卡、3 个活动（已结束可复盘 / 进行中 / 即将开始）、4 篇稿件（已发布、送审中、被退回、品牌助手写的含违禁词草稿）、最近 3 天的订单和约 15 张安装工单（已预约、异常、带备注的各有一张；手机号用 100 号段，不是真号码）。
 
 ## 环境
 
@@ -49,7 +49,7 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 
 每天 `WB_DAILY_AT`（默认 `08:30`，上海时区）跑商品规则、投放规则，再生成昨天的日报。配了 `WB_FEISHU_WEBHOOK` 或 `WB_WECOM_WEBHOOK` 才推送。`WB_SCHEDULER=off` 关掉定时任务。
 
-接口说明在 `docs/CONTRACT-products.md`、`docs/CONTRACT-overview.md`、`docs/CONTRACT-brand.md`，MCP 工具在 `docs/CONTRACT-mcp.md`。
+接口说明在 `docs/CONTRACT-products.md`、`docs/CONTRACT-overview.md`、`docs/CONTRACT-brand.md`，安装工单在 `docs/CONTRACT-installs.md`，MCP 工具在 `docs/CONTRACT-mcp.md`。
 
 ## 导入样表
 

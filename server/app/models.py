@@ -115,7 +115,7 @@ class ImportRun(Base):
     __tablename__ = "import_runs"
     __table_args__ = (
         CheckConstraint(
-            "kind IN ('products', 'metrics', 'ad_spend')",
+            "kind IN ('products', 'metrics', 'ad_spend', 'orders')",
             name="ck_import_runs_kind",
         ),
         Index("ix_import_runs_shop_id", "shop_id"),
@@ -427,3 +427,63 @@ class ContentComment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     content: Mapped[Content] = relationship(back_populates="comments")
+
+
+# ---- C07 安装：订单和安装工单 ----
+
+INSTALL_STATUSES = ("pending", "booked", "done", "exception", "cancelled")
+
+
+class Order(Base):
+    __tablename__ = "orders"
+    __table_args__ = (
+        UniqueConstraint("shop_id", "order_no", "sku", name="uq_orders_shop_no_sku"),
+        Index("ix_orders_shop_id", "shop_id"),
+        Index("ix_orders_paid_at", "paid_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id"), nullable=False)
+    order_no: Mapped[str] = mapped_column(String(64), nullable=False)
+    paid_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    sku: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    product_code: Mapped[str | None] = mapped_column(String(128))
+    title: Mapped[str] = mapped_column(String(500), nullable=False)
+    quantity: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    amount: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    buyer_name: Mapped[str | None] = mapped_column(String(100))
+    phone: Mapped[str | None] = mapped_column(String(40))
+    address: Mapped[str | None] = mapped_column(String(500))
+    remark: Mapped[str | None] = mapped_column(Text)
+    platform_status: Mapped[str | None] = mapped_column(String(50))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    shop: Mapped[Shop] = relationship()
+
+
+class InstallOrder(Base):
+    __tablename__ = "install_orders"
+    __table_args__ = (
+        UniqueConstraint("order_id", name="uq_install_orders_order"),
+        CheckConstraint(
+            "status IN ('pending', 'booked', 'done', 'exception', 'cancelled')", name="ck_install_orders_status"
+        ),
+        Index("ix_install_orders_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    shop_id: Mapped[int] = mapped_column(ForeignKey("shops.id"), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    provider: Mapped[str] = mapped_column(String(50), nullable=False, default="啄木鸟")
+    provider_ref: Mapped[str | None] = mapped_column(String(100))
+    appointment_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    engineer: Mapped[str | None] = mapped_column(String(100))
+    exception_reason: Mapped[str | None] = mapped_column(Text)
+    note: Mapped[str | None] = mapped_column(Text)
+    events: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    order: Mapped[Order] = relationship()
+    shop: Mapped[Shop] = relationship()

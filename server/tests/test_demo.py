@@ -11,5 +11,6 @@ def test_demo_builds_a_lively_but_small_dataset(tmp_path, monkeypatch):
     assert 1 <= summary["未处理投放提醒"] <= 5
     assert summary["活动"] == 3
     assert summary["稿件"] == 4
+    assert 10 <= summary["安装工单"] <= 40
     again = build(db)
     assert again == summary  # 固定随机种子，同一天重跑结果一样

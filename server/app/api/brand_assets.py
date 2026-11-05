@@ -23,6 +23,7 @@ from app.brand_schemas import (
     ProductCardPatch,
 )
 from app.db import get_db
+from app.installs import sync_installs
 from app.errors import AppError
 from app.models import BannedWord, BrandGuide, Product, ProductCard, utcnow
 
@@ -158,6 +159,8 @@ def create_card(payload: ProductCardIn, session: Session = Depends(get_db)) -> P
     )
     session.add(card)
     session.flush()
+    if card.install_required:
+        sync_installs(session)
     return card_out(session, card)
 
 
@@ -182,6 +185,8 @@ def patch_card(card_id: int, payload: ProductCardPatch, session: Session = Depen
             setattr(card, name, getattr(payload, name))
     card.updated_at = utcnow()
     session.flush()
+    if card.install_required:
+        sync_installs(session)
     return card_out(session, card)
 
 

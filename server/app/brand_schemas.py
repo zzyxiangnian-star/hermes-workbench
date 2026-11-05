@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
@@ -461,3 +461,80 @@ class VersionSnapshot(APIModel):
     note: str | None
     created_at: UtcDateTime
     snapshot: dict
+
+
+# ---- C07 安装 ----
+
+InstallStatus = Literal["pending", "booked", "done", "exception", "cancelled"]
+
+
+class InstallOut(BaseModel):
+    id: int
+    code: str
+    status: str
+    overdue: bool
+    shop_id: int
+    shop_name: str
+    order_id: int
+    order_no: str
+    paid_at: UtcDateTime
+    title: str
+    product_code: str | None
+    quantity: int
+    amount: float
+    buyer_name: str | None
+    phone: str | None
+    address: str | None
+    remark: str | None
+    provider: str
+    provider_ref: str | None
+    appointment_at: UtcDateTime | None
+    engineer: str | None
+    exception_reason: str | None
+    note: str | None
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
+
+
+class InstallEvent(BaseModel):
+    at: str
+    by: str | None
+    text: str
+
+
+class InstallDetail(InstallOut):
+    events: list[InstallEvent]
+
+
+class InstallSummary(BaseModel):
+    pending: int
+    booked: int
+    done: int
+    exception: int
+    cancelled: int
+    overdue: int
+    needs_action: int
+
+
+class InstallStatusIn(BaseModel):
+    status: InstallStatus
+    by: str | None = None
+    appointment_at: datetime | None = None
+    engineer: str | None = None
+    provider_ref: str | None = None
+    reason: str | None = None
+
+    _c = field_validator("by", "engineer", "provider_ref", "reason")(lambda cls, v: _clean(v))
+
+
+class InstallNoteIn(BaseModel):
+    note: str = Field(max_length=1000)
+    by: str | None = None
+
+    _r = field_validator("note")(lambda cls, v: _required(v))
+    _c = field_validator("by")(lambda cls, v: _clean(v))
+
+
+class InstallExportIn(BaseModel):
+    ids: list[int] | None = None
+    status: InstallStatus | None = "pending"

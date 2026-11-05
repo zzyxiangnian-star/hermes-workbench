@@ -8,7 +8,7 @@
         经营-1105.xlsx
         投放-1105.csv
 
-按表头自动判断是商品、经营还是投放表。导入成功的移到该店铺下的“已导入”，失败的移到“失败”并写一份同名的“.原因.txt”。
+按表头自动判断是商品、经营、投放还是订单表。导入成功的移到该店铺下的“已导入”，失败的移到“失败”并写一份同名的“.原因.txt”。
 """
 
 from __future__ import annotations
@@ -37,6 +37,7 @@ from app.importer import (
     read_table,
     resolve_columns,
 )
+from app.installs import ORDER_ALIASES, ORDER_LABELS, ORDER_REQUIRED, import_orders
 from app.models import Shop
 from app.overview import SHANGHAI
 
@@ -46,7 +47,7 @@ SUFFIXES = {".xlsx", ".xls", ".csv"}
 DONE_DIR = "已导入"
 FAILED_DIR = "失败"
 SETTLE_SECONDS = 10
-KIND_LABELS = {"products": "商品", "metrics": "经营", "ad_spend": "投放"}
+KIND_LABELS = {"products": "商品", "metrics": "经营", "ad_spend": "投放", "orders": "订单"}
 
 
 def import_dir() -> Path | None:
@@ -67,10 +68,15 @@ def detect_kind(file_name: str, content: bytes) -> str:
         except AppError:
             continue
     try:
+        resolve_columns(columns, None, aliases=ORDER_ALIASES, required=ORDER_REQUIRED, labels=ORDER_LABELS)
+        return "orders"
+    except AppError:
+        pass
+    try:
         resolve_columns(columns, None)
         return "products"
     except AppError as exc:
-        raise AppError(400, "unknown_table", "看不出是商品、经营还是投放表：" + exc.message) from exc
+        raise AppError(400, "unknown_table", "看不出是商品、经营、投放还是订单表：" + exc.message) from exc
 
 
 def scan(session_factory: sessionmaker, root: Path | None = None, *, settle_seconds: int = SETTLE_SECONDS) -> dict:
@@ -134,6 +140,8 @@ def _run(session: Session, kind: str, shop_id: int, file_name: str, content: byt
         run, _stats = import_products(session, shop_id=shop_id, file_name=file_name, content=content)
     elif kind == "metrics":
         run = import_metrics(session, shop_id=shop_id, file_name=file_name, content=content)
+    elif kind == "orders":
+        run, _stats = import_orders(session, shop_id=shop_id, file_name=file_name, content=content)
     else:
         run, _stats = import_ad_spend(session, shop_id=shop_id, file_name=file_name, content=content)
     return run

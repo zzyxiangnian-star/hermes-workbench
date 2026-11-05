@@ -23,6 +23,9 @@ EXPECTED_TOOLS = {
     "wb_list_contents",
     "wb_get_content",
     "wb_create_draft",
+    "wb_list_installs",
+    "wb_get_install",
+    "wb_add_install_note",
 }
 
 
@@ -75,7 +78,7 @@ def test_tool_list_is_read_only_plus_note(client):
         assert tool["description"], tool["name"]
         assert any("一" <= ch <= "鿿" for ch in tool["description"]), tool["name"]
     forbidden = ("status", "rule", "import", "send", "price", "delete", "update", "patch", "set")
-    for name in names - {"wb_add_note", "wb_create_draft"}:
+    for name in names - {"wb_add_note", "wb_create_draft", "wb_add_install_note"}:
         assert not any(word in name for word in forbidden), name
     note_params = set(next(t for t in tools if t["name"] == "wb_add_note")["inputSchema"]["properties"])
     assert note_params == {"issue_id", "note"}
@@ -280,3 +283,31 @@ def test_create_draft_stays_draft(client):
         t["name"]: set(t["inputSchema"]["properties"]) for t in rpc(client, "tools/list")["result"]["tools"]
     }["wb_create_draft"]
     assert "status" not in create_params and "author" not in create_params
+
+
+def test_install_tools_mask_customer_info(client):
+    from test_installs import AC, orders_csv, setup
+
+    shop = setup(client)
+    upload_to(client, "/api/import/orders", shop["id"], "o.csv", orders_csv(AC))
+    failed, data = call(client, "wb_list_installs", status="pending")
+    assert not failed, data
+    assert data["summary"]["pending"] == 1
+    [item] = data["items"]
+    assert item["phone"] == "138****5678"
+    assert item["address"] == "广东省深圳市南山区****"
+    assert item["buyer_name"] == "张*"
+    assert "13812345678" not in json.dumps(data, ensure_ascii=False)
+
+    failed, detail = call(client, "wb_get_install", install_id=item["id"])
+    assert not failed and detail["phone"] == "138****5678" and detail["events"]
+
+    failed, noted = call(client, "wb_add_install_note", install_id=item["id"], note="买家下午在家，优先约下午")
+    assert not failed
+    assert noted["status"] == "pending"
+    assert noted["note"] == "[电商助手] 买家下午在家，优先约下午"
+    assert "13812345678" not in json.dumps(noted, ensure_ascii=False)
+    full = client.get(f"/api/installs/{item['id']}").json()
+    assert full["phone"] == "13812345678"
+    failed, message = call(client, "wb_add_install_note", install_id=999, note="x")
+    assert failed and "工单不存在" in message

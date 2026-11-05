@@ -43,7 +43,7 @@ def test_folder_scan_detects_kinds_and_moves_files(client, tmp_path, monkeypatch
     assert kinds == {"商品1105.xlsx": "products", "经营1105.xlsx": "metrics", "投放1105.xlsx": "ad_spend"}
     reasons = {item["file"]: item["reason"] for item in body["files"] if not item["ok"]}
     assert "没有叫“没有这个店”的店铺" in reasons["a.csv"]
-    assert "看不出是商品、经营还是投放表" in reasons["乱表.csv"]
+    assert "看不出是商品、经营、投放还是订单表" in reasons["乱表.csv"]
 
     done = sorted(p.name for p in (shop_dir / "已导入").iterdir())
     assert sum(name.endswith(".xlsx") for name in done) == 3
