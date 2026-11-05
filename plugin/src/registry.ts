@@ -25,7 +25,7 @@ export function registerWorkbench(def: WorkbenchDef): () => void {
   workbenchMap.set(def.id, def)
   emitWorkbenches()
 
-  // 若尚未初始化位置，默认指向第一个注册的工作台首页
+  // 若尚未初始化位置，默认指向第一个注册的工作台首�?
   if (!locationSnapshot && def.pages.length > 0) {
     setLocationInternal({ workbench: def.id, page: def.pages[0].id })
   }
@@ -114,9 +114,7 @@ export function setNavigator(fn: (path: string) => void): void {
 
 export function syncLocationFromPath(path: string): void {
   const parsed = parsePath(path)
-  if (parsed) {
-    setLocationInternal(parsed)
-  }
+  setLocationInternal(parsed)
 }
 
 export function openPage(loc: WorkbenchLocation): void {

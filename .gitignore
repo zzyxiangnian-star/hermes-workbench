@@ -1,4 +1,7 @@
 node_modules/
 dist/
 .vite/
+plugin/node_modules/
+plugin/dist/
+plugin/.vite/
 *.local

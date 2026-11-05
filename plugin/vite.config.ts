@@ -8,7 +8,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
-      '@hermes/plugin-sdk': path.resolve(__dirname, 'preview/sdk-stub.tsx')
+      '@hermes/plugin-sdk': path.resolve(__dirname, 'preview/sdk-stub.tsx'),
+      'virtual:hermes-workbench-css': path.resolve(__dirname, 'preview/empty-css.ts')
     }
   },
   build: {

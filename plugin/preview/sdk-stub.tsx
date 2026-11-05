@@ -361,3 +361,13 @@ export const host = {
     }
   }
 }
+export interface PluginContext {
+  register: (contribution: {
+    id: string
+    area: string
+    title?: string
+    data?: unknown
+    render?: () => any
+  }) => (() => void) | void
+  onDispose?: (fn: () => void) => void
+}

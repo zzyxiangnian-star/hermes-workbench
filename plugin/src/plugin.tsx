@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { host, ROUTES_AREA, type RouteContribution } from '@hermes/plugin-sdk'
+import { injectPluginCss } from './inject-css'
 import { brandWorkbench } from './modules/brand'
 import { ecommerceWorkbench } from './modules/ecommerce'
 import {
@@ -26,6 +27,9 @@ interface PluginContext {
 const BUILTIN_WORKBENCHES = [ecommerceWorkbench, brandWorkbench]
 
 function setupWorkbenchPlugin(ctx: PluginContext) {
+  // 0. 注入打包构建时生成的 Tailwind 样式（卸载时移除）
+  injectPluginCss(ctx)
+
   // 1. 注册内置的两个工作台模块（电商、品牌活动）
   const disposeWorkbenches = BUILTIN_WORKBENCHES.map(wb => registerWorkbench(wb))
 
@@ -37,17 +41,17 @@ function setupWorkbenchPlugin(ctx: PluginContext) {
   // 3. 同步当前路由位置：
   // Hermes SDK (apps/desktop/src/sdk/index.ts) 目前未在 host.state 中暴露当前路由路径 atom，
   // 但桌面端采用 HashRouter（host.navigate 内部写入 window.location.hash = `#${to}`），
-  // 因此通过读取 window.location.hash 并监听 hashchange 来同步当前工作台分页。
+  // 因此通过读取 window.location.hash 并监听 hashchange/popstate 来同步当前工作台分页。
+  // 若路由不是工作台路径（例如切回某个对话），syncLocationFromPath 会将 location 置空，清除左栏高亮。
   const syncFromWindowHash = () => {
     if (typeof window === 'undefined') return
     const hashPath = window.location.hash.replace(/^#/, '')
-    if (hashPath) {
-      syncLocationFromPath(hashPath)
-    }
+    syncLocationFromPath(hashPath)
   }
   syncFromWindowHash()
   if (typeof window !== 'undefined') {
     window.addEventListener('hashchange', syncFromWindowHash)
+    window.addEventListener('popstate', syncFromWindowHash)
   }
 
   // 4. 注册左栏“工作台”面板
@@ -72,33 +76,25 @@ function setupWorkbenchPlugin(ctx: PluginContext) {
     render: () => <WorkbenchPane />
   })
 
-  // 5. 注册主区域页面路由
-  // 参考 apps/desktop/src/plugins/kanban/plugin.tsx 第 107-113 行。
-  // 注意：apps/desktop/src/app/routes.ts 第 119-121 行 isContributedPath(pathname) 使用
-  // `route.path === pathname` 严格相等判断，不支持 `/workbench/*` 通配。
-  // 因此为每个工作台的每个分页显式注册一条精确路由，同时额外注册一条 `/workbench/*` 兜底。
+  // 5. 注册主区域页面路由（带中文标题）
+  // 参考 apps/desktop/src/plugins/kanban/plugin.tsx 第 107-113 行 与 apps/desktop/src/app/chat/route-tile.tsx 第 54 行。
   for (const wb of listWorkbenches()) {
     for (const page of wb.pages) {
       const path = toPath({ workbench: wb.id, page: page.id })
       ctx.register({
         id: `page:${wb.id}:${page.id}`,
         area: ROUTES_AREA,
+        title: `${wb.name} · ${page.label}`,
         data: { path } satisfies RouteContribution,
         render: () => <WorkbenchPage />
       })
     }
   }
 
-  ctx.register({
-    id: 'page:wildcard',
-    area: ROUTES_AREA,
-    data: { path: '/workbench/*' } satisfies RouteContribution,
-    render: () => <WorkbenchPage />
-  })
-
   const cleanup = () => {
     if (typeof window !== 'undefined') {
       window.removeEventListener('hashchange', syncFromWindowHash)
+      window.removeEventListener('popstate', syncFromWindowHash)
     }
     for (const dispose of disposeWorkbenches) {
       dispose()
