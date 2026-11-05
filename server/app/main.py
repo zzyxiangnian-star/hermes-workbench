@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from app.api import api_router
 from app.db import default_database_url, init_db, make_engine, make_session_factory
 from app.errors import AppError, error_body
+from app.mcp_server import build_mcp
 from app.scheduler import start_scheduler
 
 logger = logging.getLogger("workbench")
@@ -37,7 +38,7 @@ _VALIDATION_MESSAGES = {
 def create_app(database_url: str | None = None) -> FastAPI:
     url = database_url or default_database_url()
     engine = make_engine(url)
-    app = FastAPI(title="Hermes 工作台商品接口", version="0.2.0", lifespan=_lifespan)
+    app = FastAPI(title="Hermes 工作台商品接口", version="0.3.0", lifespan=_lifespan)
     app.state.engine = engine
     app.state.database_url = url
     app.state.session_factory = make_session_factory(engine)
@@ -53,6 +54,10 @@ def create_app(database_url: str | None = None) -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(api_router)
+    # 电商助手的 MCP 工具，Streamable HTTP，地址 /mcp。
+    mcp = build_mcp(app.state.session_factory)
+    app.state.mcp = mcp
+    app.router.routes.extend(mcp.streamable_http_app().routes)
     app.add_exception_handler(AppError, _app_error)
     app.add_exception_handler(RequestValidationError, _validation_error)
     app.add_exception_handler(HTTPException, _http_error)
@@ -66,7 +71,8 @@ async def _lifespan(app: FastAPI):
     scheduler = start_scheduler(app.state.session_factory)
     app.state.scheduler = scheduler
     try:
-        yield
+        async with app.state.mcp.session_manager.run():
+            yield
     finally:
         if scheduler is not None:
             scheduler.shutdown(wait=False)

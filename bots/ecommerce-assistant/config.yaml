@@ -1,0 +1,16 @@
+# 电商助手 Bot 的配置片段。
+# 创建 Bot 时从 default 克隆（模型和 Key 沿用 default），再把下面两段合并进该 Bot 的 config.yaml。
+# 注意：MCP 写在 config.yaml 的 mcp_servers 里，Bot 不读 mcp.json。
+
+mcp_servers:
+  hermes-workbench:
+    # 工作台后端随 workbench-api 启动，只监听本机。
+    url: http://127.0.0.1:8000/mcp
+
+agent:
+  # 电商助手只查数据、写备注，不需要执行命令、操作浏览器、跑代码或改本地文件。
+  disabled_toolsets:
+    - terminal
+    - browser
+    - code_execution
+    - file
