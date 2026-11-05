@@ -1,4 +1,4 @@
-"""电商助手、品牌助手用的 MCP 工具。只读为主；写操作只有五个：给商品问题、安装工单、询盘追加备注，新建稿件草稿，给设计需求单交候选稿。
+"""电商助手、品牌助手用的 MCP 工具。只读为主；写操作只有：给商品问题、安装工单、询盘追加备注，新建稿件草稿，给设计需求单交候选稿，新建视频脚本、给写脚本中的分镜交配音和画面。
 
 HTTP：随主服务挂在 /mcp（Streamable HTTP）。
 本地调试：python -m app.mcp_server --stdio
@@ -40,7 +40,13 @@ from app.api.customers import list_customers, list_inquiries, segment_summary
 from app.customers import add_inquiry_note, mask_text
 from app.api.design import _request as _design_request
 from app.api.design import asset_out, get_request as get_design_request, list_requests as list_design_requests
-from app.design import add_candidate, load_ai_image, store_file
+from app.design import add_candidate, load_ai_file, load_ai_image, store_file
+from app.api.design import list_assets
+from app.api.video import _project as _video_project
+from app.api.video import attach_media, create_project as create_video_project, get_project as get_video_project
+from app.api.video import list_projects as list_video_projects
+from app.design_schemas import VideoProjectIn
+from app.video import check_media, require_editable
 from app.installs import mask_address, mask_name, mask_phone
 from app.brand_schemas import ContentIn
 from app.contents import compliance_of
@@ -48,21 +54,22 @@ from app.api.issues import _issue_out, list_issues
 from app.api.reports import _report_out
 from app.errors import AppError
 from app.brand import campaign_review, check_text
-from app.models import Issue, Product, ProductCard
+from app.models import Asset, Issue, Product, ProductCard
 from app.overview import build_overview, build_trend, overview_payload
 from app.reports import build_daily_report, report_day
 
 NOTE_PREFIX = "[电商助手] "
 AI_AUTHOR = "品牌助手"
 AI_DESIGNER = "设计助手"
+AI_VIDEO = "视频助手"
 MAX_ISSUES = 50
 MAX_NOTE = 500
 
 INSTRUCTIONS = (
     "Hermes 工作台的数据。电商：商品问题、单个商品、经营总览、趋势、投放提醒、日报、安装工单（顾客信息已打码），"
     "客户档案和会员分层、B 端询盘和报价（客户信息已打码），可给商品问题、安装工单和询盘追加备注。"
-    "品牌活动：活动日历和复盘、违禁词检查、商品资料卡、品牌规范、稿件，可把文案存成新草稿；设计需求单，可把生成的图交成候选稿。"
-    "不能改状态、改规则、导入数据、发日报、改价，不能建报价单或批量跟进、不能给客户发消息，不能送审、通过或发布稿件，不能定稿、退回或删除设计稿，也不能新建或修改活动和资料。"
+    "品牌活动：活动日历和复盘、违禁词检查、商品资料卡、品牌规范、稿件，可把文案存成新草稿；设计需求单，可把生成的图交成候选稿；短视频项目，可新建分镜脚本、给分镜交配音和画面。"
+    "不能改状态、改规则、导入数据、发日报、改价，不能建报价单或批量跟进、不能给客户发消息，不能送审、通过或发布稿件，不能定稿、退回或删除设计稿，不能送审或通过视频脚本，也不能新建或修改活动和资料。"
 )
 
 
@@ -587,6 +594,138 @@ def build_mcp(session_factory: sessionmaker) -> Any:
             return {"request_status": item.status, "round": item.round, "candidate": asset_out(asset)}
 
         return run(write)
+
+    # ---- C10 短视频（视频助手）----
+
+    @mcp.tool(
+        description=(
+            "列出短视频项目。status：active 未完成（默认）/ draft 写脚本 / in_review 待审核 / approved 已通过 / "
+            "done 已完成 / cancelled 已取消。最多 50 条。"
+        )
+    )
+    def wb_list_video_projects(status: str | None = "active", brand: str | None = None, limit: int = 20) -> dict[str, Any]:
+        size = max(1, min(int(limit), MAX_ISSUES))
+
+        def query(session: Session) -> dict:
+            items = list_video_projects(status=status, brand=brand, campaign_id=None, q=None, session=session)
+            return {"total": len(items), "items": items[:size]}
+
+        return run(query)
+
+    @mcp.tool(
+        description=(
+            "查一个短视频项目：每镜的画面说明、口播、字幕、时长、起止时间、画面和配音素材、审核意见（events）、"
+            "口播和字幕的违禁词检查。"
+        )
+    )
+    def wb_get_video_project(project_id: int) -> dict[str, Any]:
+        return run(lambda session: get_video_project(project_id=project_id, session=session))
+
+    @mcp.tool(
+        description=(
+            "新建一个短视频脚本（状态为写脚本，作者固定为“视频助手”），由人修改、送审。"
+            "aspect：9:16 / 16:9 / 1:1 / 3:4。platform：douyin、xiaohongshu、wechat 等。"
+            "shots 是分镜列表，每镜 {duration 秒（≤60）, visual 画面说明, voiceover 口播, subtitle 字幕（不填同口播，填空字符串表示不要字幕）}，最多 60 镜。"
+            "口播先用 wb_check_compliance 检查。"
+        )
+    )
+    def wb_create_video_project(
+        title: str,
+        brand: str,
+        shots: list[dict[str, Any]],
+        product_code: str | None = None,
+        campaign_id: int | None = None,
+        platform: str | None = None,
+        aspect: str = "9:16",
+        brief: str | None = None,
+    ) -> dict[str, Any]:
+        clean_shots = [
+            {key: shot.get(key) for key in ("duration", "visual", "voiceover", "subtitle") if shot.get(key) is not None}
+            for shot in shots
+            if isinstance(shot, dict)
+        ]
+        try:
+            payload = VideoProjectIn(
+                title=title,
+                brand=brand,
+                shots=clean_shots,
+                product_code=product_code,
+                campaign_id=campaign_id,
+                platform=platform,
+                aspect=aspect,
+                brief=brief,
+                author=AI_VIDEO,
+            )
+        except ValidationError as exc:
+            raise ToolFailure("参数不正确：" + "; ".join(_short_error(err) for err in exc.errors())) from exc
+
+        def write(session: Session) -> Any:
+            detail = create_video_project(payload=payload, session=session)
+            return {"id": detail["id"], "status": detail["status"], "shot_count": detail["shot_count"], "duration": detail["duration"]}
+
+        return run(write)
+
+    @mcp.tool(
+        description=(
+            "给写脚本中的项目的某一镜交配音或画面。slot=voice 配音（text_to_speech 返回的 file_path，MP3/WAV/M4A/OGG）；"
+            "slot=visual 画面（image_generate 返回的 image，或用 asset_id 选素材库里已有的图）。"
+            "file 可以是 https 链接、data 链接，或 Hermes 目录里的本机文件。单个最多 20 MB。不能改已送审的项目。"
+        )
+    )
+    def wb_add_shot_media(
+        project_id: int,
+        seq: int,
+        slot: str,
+        file: str | None = None,
+        asset_id: int | None = None,
+        prompt: str | None = None,
+    ) -> dict[str, Any]:
+        if (file is None) == (asset_id is None):
+            raise ToolFailure("file 和 asset_id 要且只能给一个")
+
+        def write(session: Session) -> Any:
+            project = _video_project(session, project_id)
+            require_editable(project)
+            if asset_id is not None:
+                if slot != "visual":
+                    raise ToolFailure("素材库里的素材只能当画面用")
+                asset = session.get(Asset, asset_id)
+                if asset is None or asset.role not in {"final", "library"}:
+                    raise ToolFailure("素材库里没有这个素材")
+                check_media(asset, "visual")
+                shot = next((s for s in project.shots if s.seq == seq), None)
+                if shot is None:
+                    raise ToolFailure(f"没有第 {seq} 镜")
+                shot.media_asset_id = asset.id
+                session.flush()
+                session.refresh(shot)
+            else:
+                data, name = load_ai_file(file)
+                attach_media(
+                    session, project, seq, slot, store_file(data, name), by=AI_VIDEO, source="ai",
+                    prompt=(prompt or "").strip()[:4000] or None,
+                )
+            detail = get_video_project(project_id=project_id, session=session)
+            shot_out = next(s for s in detail["shots"] if s["seq"] == seq)
+            return {"project_status": detail["status"], "duration": detail["duration"], "shot": shot_out}
+
+        return run(write)
+
+    @mcp.tool(
+        description="在素材库里找图和视频（定稿和上传的素材），可按品牌、商品编码、类型、关键词筛选。只返回信息，不返回文件内容。最多 50 条。"
+    )
+    def wb_search_library(
+        brand: str | None = None, product_code: str | None = None, kind: str | None = None, q: str | None = None, limit: int = 20
+    ) -> dict[str, Any]:
+        size = max(1, min(int(limit), MAX_ISSUES))
+
+        def query(session: Session) -> dict:
+            items = list_assets(
+                role=None, brand=brand, product_code=product_code, campaign_id=None, kind=kind, q=q, limit=size, session=session
+            )
+            return {"total": len(items), "items": items}
+
+        return run(query)
 
     return mcp
 

@@ -1,7 +1,7 @@
 """设计页：设计需求单、候选稿、图上批注、定稿和素材库。
 
 文件存在本机 WB_ASSET_DIR（默认 server/data/assets），按内容的 sha256 命名，同一张图只存一份。
-只收常见的图片、PDF、PSD 和视频；类型按文件头判断，不信扩展名。
+只收常见的图片、PDF、PSD、视频和音频；类型按文件头判断，不信扩展名。
 生图助手（Hermes 的 image_generate）出的图通过 MCP 交回：可以是 https 链接、data: 链接，
 或 Hermes 存在本机的文件（只认 WB_AI_IMAGE_DIRS 里的目录，默认 ~/.hermes）。
 """
@@ -63,7 +63,12 @@ EXTENSIONS = {
     "image/vnd.adobe.photoshop": ".psd",
     "video/mp4": ".mp4",
     "video/quicktime": ".mov",
+    "audio/mpeg": ".mp3",
+    "audio/wav": ".wav",
+    "audio/mp4": ".m4a",
+    "audio/ogg": ".ogg",
 }
+AUDIO_MIMES = {"audio/mpeg", "audio/wav", "audio/mp4", "audio/ogg"}
 
 
 # ---- 存文件 ----
@@ -98,7 +103,16 @@ def sniff_mime(head: bytes) -> str | None:
     if head.startswith(b"8BPS"):
         return "image/vnd.adobe.photoshop"
     if head[4:8] == b"ftyp":
-        return "video/quicktime" if head[8:10] == b"qt" else "video/mp4"
+        brand = head[8:12]
+        if brand in (b"M4A ", b"M4B "):
+            return "audio/mp4"
+        return "video/quicktime" if brand[:2] == b"qt" else "video/mp4"
+    if head[:4] == b"RIFF" and head[8:12] == b"WAVE":
+        return "audio/wav"
+    if head.startswith(b"ID3") or (len(head) > 1 and head[0] == 0xFF and head[1] & 0xE0 == 0xE0):
+        return "audio/mpeg"
+    if head.startswith(b"OggS"):
+        return "audio/ogg"
     return None
 
 
@@ -150,7 +164,7 @@ def store_file(data: bytes, file_name: str) -> dict:
         raise AppError(413, "file_too_large", f"文件超过 {max_upload_bytes() // 1024 // 1024} MB")
     mime = sniff_mime(data[:32])
     if mime is None:
-        raise AppError(400, "unsupported_file", "只支持 PNG、JPG、GIF、WebP、PDF、PSD、MP4、MOV")
+        raise AppError(400, "unsupported_file", "只支持 PNG、JPG、GIF、WebP、PDF、PSD、MP4、MOV、MP3、WAV、M4A、OGG")
     digest = hashlib.sha256(data).hexdigest()
     relative = f"{digest[:2]}/{digest}{EXTENSIONS[mime]}"
     target = asset_dir() / relative
@@ -203,9 +217,17 @@ def ai_image_roots() -> list[Path]:
 
 def load_ai_image(source: str) -> tuple[bytes, str]:
     """把生图工具返回的 image 字段变成文件内容。只收图片。"""
+    data, name = load_ai_file(source)
+    if sniff_mime(data[:32]) not in IMAGE_MIMES:
+        raise AppError(400, "invalid_image", "不是 PNG、JPG、GIF 或 WebP 图片")
+    return data, name
+
+
+def load_ai_file(source: str) -> tuple[bytes, str]:
+    """生图、配音工具返回的结果：https 链接、data: 链接，或 Hermes 目录里的本机文件。"""
     text = (source or "").strip()
     if not text:
-        raise AppError(400, "image_required", "缺少图片")
+        raise AppError(400, "image_required", "缺少文件")
     limit = MAX_AI_IMAGE_MB * 1024 * 1024
     if text.startswith("data:"):
         header, _, payload = text.partition(",")
@@ -221,37 +243,35 @@ def load_ai_image(source: str) -> tuple[bytes, str]:
     else:
         path = Path(text).expanduser().resolve()
         if not any(root == path or root in path.parents for root in ai_image_roots()):
-            raise AppError(400, "path_not_allowed", "只能读取 Hermes 生图目录里的文件")
+            raise AppError(400, "path_not_allowed", "只能读取 Hermes 生图、配音目录里的文件")
         if not path.is_file():
-            raise AppError(404, "image_not_found", "图片文件不存在")
+            raise AppError(404, "image_not_found", "文件不存在")
         if path.stat().st_size > limit:
-            raise AppError(413, "file_too_large", f"图片超过 {MAX_AI_IMAGE_MB} MB")
+            raise AppError(413, "file_too_large", f"文件超过 {MAX_AI_IMAGE_MB} MB")
         data, name = path.read_bytes(), path.name
     if len(data) > limit:
-        raise AppError(413, "file_too_large", f"图片超过 {MAX_AI_IMAGE_MB} MB")
-    if sniff_mime(data[:32]) not in IMAGE_MIMES:
-        raise AppError(400, "invalid_image", "不是 PNG、JPG、GIF 或 WebP 图片")
+        raise AppError(413, "file_too_large", f"文件超过 {MAX_AI_IMAGE_MB} MB")
     return data, name
 
 
 def _download(url: str, limit: int) -> tuple[bytes, str]:
     parsed = urlparse(url)
     if parsed.scheme != "https" or not parsed.hostname:
-        raise AppError(400, "invalid_url", "图片链接必须是 https")
+        raise AppError(400, "invalid_url", "链接必须是 https")
     _reject_private_host(parsed.hostname)
     try:
         with httpx.Client(timeout=30, follow_redirects=False) as client:
             with client.stream("GET", url) as response:
                 if response.status_code != 200:
-                    raise AppError(502, "download_failed", f"下载图片失败（HTTP {response.status_code}）")
+                    raise AppError(502, "download_failed", f"下载文件失败（HTTP {response.status_code}）")
                 chunks, total = [], 0
                 for chunk in response.iter_bytes():
                     total += len(chunk)
                     if total > limit:
-                        raise AppError(413, "file_too_large", f"图片超过 {MAX_AI_IMAGE_MB} MB")
+                        raise AppError(413, "file_too_large", f"文件超过 {MAX_AI_IMAGE_MB} MB")
                     chunks.append(chunk)
     except httpx.HTTPError as exc:
-        raise AppError(502, "download_failed", "下载图片失败") from exc
+        raise AppError(502, "download_failed", "下载文件失败") from exc
     return b"".join(chunks), Path(parsed.path).name or "ai-image"
 
 
@@ -260,11 +280,11 @@ def _reject_private_host(host: str) -> None:
     try:
         infos = socket.getaddrinfo(host, 443, proto=socket.IPPROTO_TCP)
     except socket.gaierror as exc:
-        raise AppError(400, "invalid_url", "图片链接的域名解析不了") from exc
+        raise AppError(400, "invalid_url", "链接的域名解析不了") from exc
     for info in infos:
         address = ipaddress.ip_address(info[4][0])
         if not address.is_global:
-            raise AppError(400, "invalid_url", "图片链接不能指向本机或内网")
+            raise AppError(400, "invalid_url", "链接不能指向本机或内网")
 
 
 # ---- 流转 ----

@@ -614,7 +614,7 @@ class FollowupTarget(Base):
 
 DESIGN_KINDS = ("main_image", "detail_page", "poster", "banner", "video_cover", "other")
 DESIGN_STATUSES = ("open", "in_progress", "reviewing", "done", "cancelled")
-ASSET_ROLES = ("reference", "candidate", "final", "library")
+ASSET_ROLES = ("reference", "candidate", "final", "library", "material")
 
 
 class DesignRequest(Base):
@@ -654,7 +654,9 @@ class DesignRequest(Base):
 class Asset(Base):
     __tablename__ = "assets"
     __table_args__ = (
-        CheckConstraint("role IN ('reference', 'candidate', 'final', 'library')", name="ck_assets_role"),
+        CheckConstraint(
+            "role IN ('reference', 'candidate', 'final', 'library', 'material')", name="ck_assets_role"
+        ),
         CheckConstraint("source IN ('upload', 'ai')", name="ck_assets_source"),
         Index("ix_assets_request_id", "request_id"),
         Index("ix_assets_role", "role"),
@@ -699,3 +701,63 @@ class DesignComment(Base):
     author: Mapped[str | None] = mapped_column(String(100))
     resolved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+# ---- C10 短视频：视频项目和分镜 ----
+
+VIDEO_STATUSES = ("draft", "in_review", "approved", "done", "cancelled")
+VIDEO_ASPECTS = ("9:16", "16:9", "1:1", "3:4")
+
+
+class VideoProject(Base):
+    __tablename__ = "video_projects"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft', 'in_review', 'approved', 'done', 'cancelled')", name="ck_video_projects_status"
+        ),
+        CheckConstraint("aspect IN ('9:16', '16:9', '1:1', '3:4')", name="ck_video_projects_aspect"),
+        Index("ix_video_projects_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    brand: Mapped[str] = mapped_column(String(200), nullable=False)
+    campaign_id: Mapped[int | None] = mapped_column(ForeignKey("campaigns.id", ondelete="SET NULL"))
+    product_code: Mapped[str | None] = mapped_column(String(128))
+    platform: Mapped[str | None] = mapped_column(String(16))
+    aspect: Mapped[str] = mapped_column(String(8), nullable=False, default="9:16")
+    brief: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="draft")
+    author: Mapped[str | None] = mapped_column(String(100))
+    reviewer: Mapped[str | None] = mapped_column(String(100))
+    editor: Mapped[str | None] = mapped_column(String(100))
+    bgm_asset_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"))
+    final_asset_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"))
+    events: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    campaign: Mapped[Campaign | None] = relationship()
+    shots: Mapped[list["VideoShot"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan", order_by="VideoShot.seq"
+    )
+
+
+class VideoShot(Base):
+    __tablename__ = "video_shots"
+    __table_args__ = (UniqueConstraint("project_id", "seq", name="uq_video_shots_seq"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("video_projects.id", ondelete="CASCADE"), nullable=False)
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)
+    duration: Mapped[float] = mapped_column(Float, nullable=False)
+    visual: Mapped[str | None] = mapped_column(Text)
+    voiceover: Mapped[str | None] = mapped_column(Text)
+    subtitle: Mapped[str | None] = mapped_column(Text)
+    media_asset_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"))
+    voice_asset_id: Mapped[int | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"))
+    note: Mapped[str | None] = mapped_column(Text)
+
+    project: Mapped[VideoProject] = relationship(back_populates="shots")
+    media: Mapped[Asset | None] = relationship(foreign_keys=[media_asset_id])
+    voice: Mapped[Asset | None] = relationship(foreign_keys=[voice_asset_id])

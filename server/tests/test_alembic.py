@@ -34,6 +34,8 @@ EXPECTED_TABLES = {
     "design_requests",
     "assets",
     "design_comments",
+    "video_projects",
+    "video_shots",
     "alembic_version",
 }
 

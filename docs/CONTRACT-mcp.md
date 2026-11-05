@@ -41,6 +41,14 @@
 | `wb_get_design_request` | `request_id` | 需求单详情（参考图、各轮候选稿、批注、文案检查） | `GET /api/design-requests/{id}` |
 | `wb_add_design_candidate` | `request_id`、`image`、`prompt`、`note`（≤500 字） | `{request_status, round, candidate}` | `POST /api/design-requests/{id}/assets` |
 
+| `wb_list_video_projects` | `status`=active、`brand`、`limit` | `{total, items: 视频项目[]}` | `GET /api/video-projects` |
+| `wb_get_video_project` | `project_id` | 项目详情（分镜、起止时间、素材、审核记录、违禁词检查） | `GET /api/video-projects/{id}` |
+| `wb_create_video_project` | `title`、`brand`、`shots[{duration, visual, voiceover, subtitle}]`、`product_code`、`campaign_id`、`platform`、`aspect`、`brief` | `{id, status:"draft", shot_count, duration}` | `POST /api/video-projects` |
+| `wb_add_shot_media` | `project_id`、`seq`、`slot`（voice / visual）、`file` 或 `asset_id`、`prompt` | `{project_status, duration, shot}` | `POST /api/video-projects/{id}/shots/{seq}/media` |
+| `wb_search_library` | `brand`、`product_code`、`kind`、`q`、`limit` | `{total, items: 素材[]}`（只有信息，没有文件内容） | `GET /api/assets` |
+
+C10 的 5 个给视频助手用，字段见 [CONTRACT-video.md](CONTRACT-video.md)。`wb_create_video_project` 作者固定为“视频助手”、状态固定为写脚本；`wb_add_shot_media` 只能改写脚本中的项目，`file` 的规矩同 `wb_add_design_candidate`（配音一般是 `text_to_speech` 返回的本机路径），`asset_id` 只能选素材库里的图或视频当画面。
+
 C09 的 3 个给设计助手用，字段见 [CONTRACT-design.md](CONTRACT-design.md)。`image` 填 Hermes `image_generate` 返回的 `image`：https 链接（只允许公网地址，不跟随跳转）、`data:image/…;base64,…`，或 `WB_AI_IMAGE_DIRS`（默认 `~/.hermes`）里的本机文件。只收 PNG、JPG、GIF、WebP，单张 ≤20 MB，每张单每轮 AI 最多 8 张。交的稿记为 `source=ai`、`created_by=设计助手`。
 
 C08 的 5 个也给电商助手用，字段见 [CONTRACT-customers.md](CONTRACT-customers.md)。姓名和联系人只留姓、手机留前三后四，询盘原文和备注里的手机号也打码。
@@ -60,4 +68,4 @@ C04、C05 的 8 个给品牌助手用，字段见 [CONTRACT-brand.md](CONTRACT-b
 
 ## 故意不做成工具的
 
-改问题或提醒的状态、改规则和投放规则、导入表格、发送日报、改价；新建或修改活动、任务、资料卡、品牌规范、违禁词；修改已有稿件、送审、审核、标记发布；改安装工单状态、导出预约表、生成顾客通知；改询盘状态、出报价单、建或审核批量跟进、导出跟进名单、标记已发；新建或修改设计需求单、定稿、退回、删除素材、上传素材库。这些都由人在工作台里操作。测试 `test_tool_list_is_read_only_plus_note` 会在有人加了这类工具时失败。
+改问题或提醒的状态、改规则和投放规则、导入表格、发送日报、改价；新建或修改活动、任务、资料卡、品牌规范、违禁词；修改已有稿件、送审、审核、标记发布；改安装工单状态、导出预约表、生成顾客通知；改询盘状态、出报价单、建或审核批量跟进、导出跟进名单、标记已发；新建或修改设计需求单、定稿、退回、删除素材、上传素材库；视频项目送审、通过、退回、取消、交成片、下载初剪包。这些都由人在工作台里操作。测试 `test_tool_list_is_read_only_plus_note` 会在有人加了这类工具时失败。

@@ -34,6 +34,11 @@ EXPECTED_TOOLS = {
     "wb_list_design_requests",
     "wb_get_design_request",
     "wb_add_design_candidate",
+    "wb_list_video_projects",
+    "wb_get_video_project",
+    "wb_create_video_project",
+    "wb_add_shot_media",
+    "wb_search_library",
 }
 
 
@@ -86,7 +91,7 @@ def test_tool_list_is_read_only_plus_note(client):
         assert tool["description"], tool["name"]
         assert any("一" <= ch <= "鿿" for ch in tool["description"]), tool["name"]
     forbidden = ("status", "rule", "import", "send", "price", "delete", "update", "patch", "set")
-    for name in names - {"wb_add_note", "wb_create_draft", "wb_add_install_note", "wb_add_inquiry_note", "wb_add_design_candidate"}:
+    for name in names - {"wb_add_note", "wb_create_draft", "wb_add_install_note", "wb_add_inquiry_note", "wb_add_design_candidate", "wb_create_video_project", "wb_add_shot_media"}:
         assert not any(word in name for word in forbidden), name
     note_params = set(next(t for t in tools if t["name"] == "wb_add_note")["inputSchema"]["properties"])
     assert note_params == {"issue_id", "note"}
@@ -253,7 +258,7 @@ def test_bot_configs_only_name_existing_tools(client):
     names = {tool["name"] for tool in rpc(client, "tools/list")["result"]["tools"]}
     bots = Path(__file__).resolve().parents[2] / "bots"
     configs = sorted(bots.glob("*/config.yaml"))
-    assert len(configs) == 3
+    assert len(configs) == 4
     for config in configs:
         data = yaml.safe_load(config.read_text(encoding="utf-8"))
         include = data["mcp_servers"]["hermes-workbench"]["tools"]["include"]
@@ -384,10 +389,52 @@ def test_design_assistant_hands_in_candidates(client, tmp_path, monkeypatch):
     failed, second = call(client, "wb_add_design_candidate", request_id=req["id"], image=str(hermes / "gen.png"))
     assert not failed and second["candidate"]["label"] == "B"
     failed, message = call(client, "wb_add_design_candidate", request_id=req["id"], image=str(tmp_path / "x.png"))
-    assert failed and "生图目录" in message
+    assert failed and "生图" in message
 
     failed, detail = call(client, "wb_get_design_request", request_id=req["id"])
     assert not failed and len(detail["candidates"]) == 2
     client.post(f"/api/design-requests/{req['id']}/finalize", json={"asset_ids": [handed["candidate"]["id"]]})
     failed, message = call(client, "wb_add_design_candidate", request_id=req["id"], image=data_url)
     assert failed and "已定稿" in message
+
+
+def test_video_assistant_writes_script_and_media(client, tmp_path, monkeypatch):
+    from test_design import png
+    from test_video import wav
+
+    failed, created = call(
+        client,
+        "wb_create_video_project",
+        title="空调省电口播",
+        brand="星年",
+        product_code="XN-AC35",
+        platform="douyin",
+        shots=[{"duration": 2, "visual": "空调特写", "voiceover": "今年夏天电费降下来了"}, {"duration": 3, "voiceover": "一级能效"}],
+    )
+    assert not failed, created
+    assert created["status"] == "draft" and created["shot_count"] == 2
+    detail = client.get(f"/api/video-projects/{created['id']}").json()
+    assert detail["author"] == "视频助手"
+
+    hermes = tmp_path / "hermes"
+    (hermes / "cache" / "audio").mkdir(parents=True)
+    (hermes / "cache" / "audio" / "tts_1.wav").write_bytes(wav(2.5))
+    monkeypatch.setenv("WB_AI_IMAGE_DIRS", str(hermes))
+    failed, voiced = call(client, "wb_add_shot_media", project_id=created["id"], seq=1, slot="voice", file=str(hermes / "cache" / "audio" / "tts_1.wav"))
+    assert not failed, voiced
+    assert voiced["shot"]["voice"]["source"] == "ai" and voiced["shot"]["length"] == 2.5
+
+    logo = client.post("/api/assets", data={"brand": "星年", "tags": "Logo"}, files={"file": ("logo.png", png())}).json()
+    failed, found = call(client, "wb_search_library", brand="星年")
+    assert not failed and found["items"][0]["id"] == logo["id"]
+    failed, pictured = call(client, "wb_add_shot_media", project_id=created["id"], seq=2, slot="visual", asset_id=logo["id"])
+    assert not failed and pictured["shot"]["media"]["id"] == logo["id"]
+
+    failed, message = call(client, "wb_add_shot_media", project_id=created["id"], seq=2, slot="voice", file=str(hermes / "cache" / "audio" / "tts_1.wav"), asset_id=1)
+    assert failed and "只能给一个" in message
+    failed, message = call(client, "wb_create_video_project", title="x", brand="星年", shots=[{"duration": 999}])
+    assert failed and "参数不正确" in message
+
+    client.post(f"/api/video-projects/{created['id']}/submit", json={})
+    failed, message = call(client, "wb_add_shot_media", project_id=created["id"], seq=1, slot="visual", asset_id=logo["id"])
+    assert failed and "不能改脚本" in message

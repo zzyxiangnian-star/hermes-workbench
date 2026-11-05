@@ -183,3 +183,106 @@ class DesignSummary(BaseModel):
     cancelled: int
     overdue: int
     needs_action: int
+
+
+# ---- C10 短视频 ----
+
+VideoAspect = Literal["9:16", "16:9", "1:1", "3:4"]
+VideoPlatform = Literal["douyin", "xiaohongshu", "wechat", "weibo", "tmall", "jd", "pdd", "other"]
+
+
+class ShotIn(BaseModel):
+    duration: float = Field(default=3.0, gt=0, le=60)
+    visual: str | None = Field(default=None, max_length=2000)
+    voiceover: str | None = Field(default=None, max_length=2000)
+    subtitle: str | None = Field(default=None, max_length=2000)
+    media_asset_id: int | None = None
+    voice_asset_id: int | None = None
+    note: str | None = Field(default=None, max_length=1000)
+
+    _c = field_validator("visual", "voiceover", "note")(lambda cls, v: _clean(v))
+    # 字幕留空字符串表示“这镜不要字幕”，None 表示“和口播一样”
+    _s = field_validator("subtitle")(lambda cls, v: None if v is None else v.strip())
+
+
+class ShotsIn(BaseModel):
+    shots: list[ShotIn] = Field(max_length=60)
+
+
+class VideoProjectIn(BaseModel):
+    title: str = Field(max_length=200)
+    brand: str = Field(max_length=200)
+    campaign_id: int | None = None
+    product_code: str | None = Field(default=None, max_length=128)
+    platform: VideoPlatform | None = None
+    aspect: VideoAspect = "9:16"
+    brief: str | None = Field(default=None, max_length=10000)
+    author: str | None = Field(default=None, max_length=100)
+    shots: list[ShotIn] = Field(default_factory=list, max_length=60)
+
+    _r = field_validator("title", "brand")(lambda cls, v: _required(v))
+    _c = field_validator("product_code", "brief", "author")(lambda cls, v: _clean(v))
+
+
+class VideoProjectPatch(BaseModel):
+    title: str | None = Field(default=None, max_length=200)
+    campaign_id: int | None = None
+    product_code: str | None = Field(default=None, max_length=128)
+    platform: VideoPlatform | None = None
+    aspect: VideoAspect | None = None
+    brief: str | None = Field(default=None, max_length=10000)
+    editor: str | None = Field(default=None, max_length=100)
+    bgm_asset_id: int | None = None
+
+    _c = field_validator("title", "product_code", "brief", "editor")(lambda cls, v: _clean(v))
+
+
+class VideoAction(BaseModel):
+    by: str | None = None
+    note: str | None = Field(default=None, max_length=2000)
+
+    _c = field_validator("by", "note")(lambda cls, v: _clean(v))
+
+
+class ShotOut(BaseModel):
+    seq: int
+    duration: float
+    length: float
+    start: float
+    visual: str | None
+    voiceover: str | None
+    subtitle: str | None
+    media: AssetOut | None
+    voice: AssetOut | None
+    note: str | None
+
+
+class VideoProjectOut(BaseModel):
+    id: int
+    title: str
+    brand: str
+    campaign_id: int | None
+    campaign_name: str | None
+    product_code: str | None
+    platform: str | None
+    aspect: str
+    brief: str | None
+    status: str
+    author: str | None
+    reviewer: str | None
+    editor: str | None
+    shot_count: int
+    duration: float
+    missing_media: int
+    missing_voice: int
+    cover: AssetOut | None
+    final: AssetOut | None
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
+
+
+class VideoProjectDetail(VideoProjectOut):
+    shots: list[ShotOut]
+    bgm: AssetOut | None
+    events: list[DesignEvent]
+    compliance: ComplianceOut

@@ -86,6 +86,7 @@ def build(db_path: Path) -> dict:
         _orders(api, shops, rng, end)
         _customers(api, shops, rng, end)
         _design(api, end)
+        _video(api)
         summary = {
             "数据库": str(db_path),
             "日期范围": f"{start} 至 {end}",
@@ -98,6 +99,7 @@ def build(db_path: Path) -> dict:
             "客户": api.get("/api/customers/segments")["total"],
             "询盘": len(api.get("/api/inquiries")),
             "设计需求单": len(api.get("/api/design-requests")),
+            "视频项目": len(api.get("/api/video-projects")),
         }
     if previous_assets is None:
         os.environ.pop("WB_ASSET_DIR", None)
@@ -552,6 +554,64 @@ def _design(api: _Api, end: date) -> None:
 
     upload("/api/assets", "星年-Logo-白底.png", _picture(300, 120, (255, 255, 255), (255, 255, 255)), {"brand": "星年", "tags": "Logo,白底"})
     upload("/api/assets", "星年-Logo-反白.png", _picture(300, 120, (200, 16, 46), (200, 16, 46)), {"brand": "星年", "tags": "Logo,反白"})
+
+
+def _silence(seconds: float, rate: int = 8000) -> bytes:
+    """演示用的静音 WAV（真实配音由视频助手或人录）。"""
+    data = b"\x00\x00" * int(seconds * rate)
+    fmt = struct.pack("<HHIIHH", 1, 1, rate, rate * 2, 2, 16)
+    body = b"WAVE" + b"fmt " + struct.pack("<I", len(fmt)) + fmt + b"data" + struct.pack("<I", len(data)) + data
+    return b"RIFF" + struct.pack("<I", len(body)) + body
+
+
+def _video(api: _Api) -> None:
+    """2 个短视频项目：一个已通过（可下载初剪包），一个还在写脚本。配音是静音占位。"""
+    client = api.client
+    poster = next((a for a in api.get("/api/assets", {"brand": "木屿"}) if a["role"] == "final"), None)
+    approved = api.post(
+        "/api/video-projects",
+        {
+            "title": "木屿夏凉被 15 秒种草",
+            "brand": "木屿",
+            "product_code": "MY-QT04",
+            "platform": "xiaohongshu",
+            "aspect": "9:16",
+            "author": "木屿运营",
+            "shots": [
+                {"duration": 3, "visual": "清晨卧室，阳光照在被子上（近景）", "voiceover": "换季了，被子也该换轻一点的。"},
+                {"duration": 4, "visual": "手抓起被角，展示轻薄透光", "voiceover": "这条夏凉被，薄到能透光，盖着不闷。", "media_asset_id": poster["id"] if poster else None},
+                {"duration": 3, "visual": "折叠收纳，放进小袋子", "voiceover": "不用的时候一折，柜子里也不占地方。"},
+                {"duration": 3, "visual": "商品图 + 价格位", "voiceover": "点左下角，看看适合你家的尺寸。", "subtitle": ""},
+            ],
+        },
+    )
+    for seq, seconds in ((1, 2.8), (2, 4.2), (3, 3.1)):
+        api._check(
+            client.post(
+                f"/api/video-projects/{approved['id']}/shots/{seq}/media",
+                data={"slot": "voice", "by": "视频助手"},
+                files={"file": (f"tts_{seq}.wav", _silence(seconds))},
+            )
+        )
+    api.post(f"/api/video-projects/{approved['id']}/submit", {"by": "木屿运营"})
+    api.post(f"/api/video-projects/{approved['id']}/approve", {"by": "品牌经理"})
+
+    api.post(
+        "/api/video-projects",
+        {
+            "title": "星年空调省电口播（抖音）",
+            "brand": "星年",
+            "product_code": "XN-AC35",
+            "platform": "douyin",
+            "author": "视频助手",
+            "brief": "双 11 预热，突出一级能效和含基础安装。",
+            "shots": [
+                {"duration": 2, "visual": "电费单特写，数字很大", "voiceover": "去年夏天的电费，你还记得吗？"},
+                {"duration": 4, "visual": "客厅里空调出风，家人看电视", "voiceover": "一级能效变频，一晚上不到一度电。"},
+                {"duration": 3, "visual": "师傅上门安装", "voiceover": "下单就含基础安装，不用再找人。"},
+            ],
+        },
+    )
 
 
 def main() -> None:
