@@ -104,3 +104,40 @@ def test_error_shape_and_rule_patch(client):
     assert disabled.json()["enabled"] is False
     missing = client.patch("/api/rules/9999", json={"enabled": True})
     assert missing.json() == {"error": {"code": "rule_not_found", "message": "规则不存在"}}
+
+
+def test_w03_gaps_level_filter_product_issues_and_summary(client):
+    from helpers import create_shop, table, upload
+
+    shop = create_shop(client)
+    other = create_shop(client, "jd", "星年京东自营店", "星年")
+    response = upload(
+        client,
+        shop["id"],
+        "p.csv",
+        table(
+            ("LOW", "F1", "低于底价", 189, 199, 20, "日常"),
+            ("FEW", "F2", "库存少", 299, 199, 1, "日常"),
+            ("OK", "F3", "正常", 299, 199, 50, "日常"),
+        ),
+    )
+    assert response.status_code == 200, response.text
+    assert upload(client, other["id"], "q.csv", table(("LOW2", "F9", "也低", 100, 199, 50, "日常"))).status_code == 200
+
+    must = client.get("/api/products", params={"issue_level": "must", "shop_id": shop["id"]}).json()
+    assert [item["sku"] for item in must["items"]] == ["LOW"]
+    warn = client.get("/api/products", params={"issue_level": "warn"}).json()
+    assert "FEW" in [item["sku"] for item in warn["items"]]
+    assert client.get("/api/products", params={"issue_level": "bad"}).status_code == 400
+
+    low = must["items"][0]
+    product_issues = client.get("/api/issues", params={"product_id": low["id"]}).json()
+    assert {item["product_id"] for item in product_issues} == {low["id"]}
+
+    summary = client.get("/api/issues/summary").json()
+    assert summary["must_open"] + summary["warn_open"] == summary["total_open"]
+    assert summary["must_open"] == 2
+    scoped = client.get("/api/issues/summary", params={"shop_id": shop["id"]}).json()
+    assert scoped["must_open"] == 1
+    assert scoped["products_with_open"] == len({i["product_id"] for i in client.get("/api/issues", params={"status": "open", "shop_id": shop["id"]}).json()})
+    assert scoped["total_open"] == summary["total_open"]

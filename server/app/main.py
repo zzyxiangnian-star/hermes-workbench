@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from app.api import api_router
 from app.db import default_database_url, init_db, make_engine, make_session_factory
 from app.errors import AppError, error_body
-from app.mcp_server import build_mcp
+from app.mcp_server import build_mcp, http_routes
 from app.scheduler import start_scheduler
 
 logger = logging.getLogger("workbench")
@@ -68,7 +68,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     # 电商助手的 MCP 工具，Streamable HTTP，地址 /mcp。
     mcp = build_mcp(app.state.session_factory)
     app.state.mcp = mcp
-    app.router.routes.extend(mcp.streamable_http_app().routes)
+    app.router.routes.extend(http_routes(mcp))
     app.add_exception_handler(AppError, _app_error)
     app.add_exception_handler(RequestValidationError, _validation_error)
     app.add_exception_handler(HTTPException, _http_error)

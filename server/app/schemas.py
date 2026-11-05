@@ -121,6 +121,9 @@ class IssueShopCount(BaseModel):
 class IssueSummary(BaseModel):
     shops: list[IssueShopCount]
     total_open: int
+    must_open: int = 0
+    warn_open: int = 0
+    products_with_open: int = 0
 
 
 class RuleOut(APIModel):

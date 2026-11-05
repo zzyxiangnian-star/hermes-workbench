@@ -13,8 +13,18 @@ from datetime import date
 from typing import Any
 
 from fastapi.encoders import jsonable_encoder
-from mcp.server.fastmcp import FastMCP
 from mcp.server.transport_security import TransportSecuritySettings
+
+try:  # mcp 1.x
+    from mcp.server.fastmcp import FastMCP as _MCPServer
+    from mcp.server.fastmcp.exceptions import ToolError
+
+    MCP_V1 = True
+except ImportError:  # mcp 2.x 把 FastMCP 改名为 MCPServer，HTTP 设置挪到 streamable_http_app()
+    from mcp.server.mcpserver import MCPServer as _MCPServer
+    from mcp.server.mcpserver.exceptions import ToolError
+
+    MCP_V1 = False
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload, sessionmaker
 
@@ -40,23 +50,35 @@ INSTRUCTIONS = (
 )
 
 
-class ToolFailure(Exception):
+class ToolFailure(ToolError):
     """工具调用失败，消息直接给模型看。"""
 
 
-def build_mcp(session_factory: sessionmaker) -> FastMCP:
-    mcp = FastMCP(
-        name="hermes-workbench",
-        instructions=INSTRUCTIONS,
-        streamable_http_path="/mcp",
-        stateless_http=True,
-        json_response=True,
-        transport_security=TransportSecuritySettings(
-            enable_dns_rebinding_protection=True,
-            allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*", "127.0.0.1", "localhost"],
-            allowed_origins=["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*", "null"],
-        ),
+def _security() -> TransportSecuritySettings:
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=["127.0.0.1:*", "localhost:*", "[::1]:*", "127.0.0.1", "localhost"],
+        allowed_origins=["http://127.0.0.1:*", "http://localhost:*", "http://[::1]:*", "null"],
     )
+
+
+_HTTP = {"streamable_http_path": "/mcp", "stateless_http": True, "json_response": True}
+
+
+def http_routes(mcp: Any) -> list:
+    """/mcp 的路由。之后才能用 mcp.session_manager。兼容 mcp 1.x 和 2.x。"""
+    if MCP_V1:
+        app = mcp.streamable_http_app()
+    else:
+        app = mcp.streamable_http_app(**_HTTP, transport_security=_security())
+    return list(app.routes)
+
+
+def build_mcp(session_factory: sessionmaker) -> Any:
+    if MCP_V1:
+        mcp = _MCPServer(name="hermes-workbench", instructions=INSTRUCTIONS, **_HTTP, transport_security=_security())
+    else:
+        mcp = _MCPServer(name="hermes-workbench", instructions=INSTRUCTIONS)
 
     @contextmanager
     def session_scope() -> Iterator[Session]:

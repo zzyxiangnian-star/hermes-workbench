@@ -3,6 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.db import get_db
+from app.errors import AppError
 from app.models import Issue, Product, Shop
 from app.schemas import ProductOut, ProductPage
 
@@ -15,6 +16,7 @@ def list_products(
     brand: str | None = None,
     q: str | None = None,
     has_issue: bool | None = None,
+    issue_level: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     session: Session = Depends(get_db),
@@ -37,6 +39,15 @@ def list_products(
             select(Issue.id).where(Issue.product_id == Product.id, Issue.status == "open").exists()
         )
         criteria.append(open_issue if has_issue else ~open_issue)
+
+    if issue_level is not None:
+        if issue_level not in {"must", "warn"}:
+            raise AppError(400, "invalid_level", "级别必须是 must 或 warn")
+        criteria.append(
+            select(Issue.id)
+            .where(Issue.product_id == Product.id, Issue.status == "open", Issue.level == issue_level)
+            .exists()
+        )
 
     count_stmt = select(func.count(Product.id))
     list_stmt = select(Product).options(joinedload(Product.shop)).order_by(Product.id)

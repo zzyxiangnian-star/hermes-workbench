@@ -41,12 +41,13 @@
 
 ## 商品
 
-`GET /api/products?shop_id=&brand=&q=&has_issue=&page=&page_size=`
+`GET /api/products?shop_id=&brand=&q=&has_issue=&issue_level=&page=&page_size=`
 
 - `shop_id`：店铺 id
 - `brand`：店铺品牌，全字匹配
 - `q`：在标题、商品编码、货号里做包含匹配
 - `has_issue`：`true` 只留有未处理问题的商品，`false` 只留没有的
+- `issue_level`：`must` / `warn`，只留有该级别未处理问题的商品（W03 后加）
 - `page` 从 1 开始，默认 1；`page_size` 默认 20，最大 100
 
 `GET /api/products?shop_id=1&q=TM-SN-011&has_issue=true&page=1&page_size=5`
@@ -81,9 +82,9 @@
 
 ## 问题
 
-`GET /api/issues?status=&level=&shop_id=`
+`GET /api/issues?status=&level=&shop_id=&product_id=`
 
-三个参数都可省略。`status` 是 `open` / `resolved` / `ignored`，`level` 是 `must` / `warn`。不传 `status` 时三种都返回。按发现时间从新到旧。
+参数都可省略（`product_id` 是 W03 后加的，抽屉直接用它）。`status` 是 `open` / `resolved` / `ignored`，`level` 是 `must` / `warn`。不传 `status` 时三种都返回。按发现时间从新到旧。
 
 `GET /api/issues?status=open&level=must&shop_id=1` 的第一条：
 
@@ -152,7 +153,7 @@
 
 检查规则时：同一商品、同一规则已经有 `open` 的问题就不另建；标成 `ignored` 且问题还在，也不另建。问题不再成立（包括原先 `ignored` 的）会自动改成 `resolved`。若人工标成 `resolved` 但数据仍然违规，下次检查会新开一条。
 
-`GET /api/issues/summary` 给左栏徽标。每个店铺都在，没有问题的 `open_count` 是 0。
+`GET /api/issues/summary?shop_id=` 给左栏徽标和商品页顶部汇总。每个店铺都在，没有问题的 `open_count` 是 0。W03 后加了三项：`must_open`、`warn_open`、`products_with_open`（涉及商品数），这三项会按 `shop_id` 筛选；`shops` 和 `total_open` 始终是全局的。
 
 导入 `samples/products-tmall.xlsx` 和 `samples/products-jd.csv` 之后：
 
@@ -174,7 +175,10 @@
       "open_count": 6
     }
   ],
-  "total_open": 20
+  "total_open": 20,
+  "must_open": 6,
+  "warn_open": 14,
+  "products_with_open": 18
 }
 ```
 

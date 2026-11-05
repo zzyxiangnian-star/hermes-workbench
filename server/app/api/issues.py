@@ -11,7 +11,7 @@ router = APIRouter()
 
 
 @router.get("/issues/summary", response_model=IssueSummary)
-def issue_summary(session: Session = Depends(get_db)) -> IssueSummary:
+def issue_summary(shop_id: int | None = None, session: Session = Depends(get_db)) -> IssueSummary:
     counts = dict(
         session.execute(
             select(Product.shop_id, func.count(Issue.id))
@@ -19,6 +19,17 @@ def issue_summary(session: Session = Depends(get_db)) -> IssueSummary:
             .group_by(Product.shop_id)
         ).all()
     )
+    scoped = select(Issue).join(Product, Issue.product_id == Product.id).where(Issue.status == "open")
+    if shop_id is not None:
+        scoped = scoped.where(Product.shop_id == shop_id)
+    scoped = scoped.subquery()
+    must_open, warn_open, products_open = session.execute(
+        select(
+            func.count().filter(scoped.c.level == "must"),
+            func.count().filter(scoped.c.level == "warn"),
+            func.count(func.distinct(scoped.c.product_id)),
+        )
+    ).one()
     shops = session.scalars(select(Shop).order_by(Shop.id)).all()
     items = [
         IssueShopCount(
@@ -30,7 +41,13 @@ def issue_summary(session: Session = Depends(get_db)) -> IssueSummary:
         )
         for shop in shops
     ]
-    return IssueSummary(shops=items, total_open=sum(item.open_count for item in items))
+    return IssueSummary(
+        shops=items,
+        total_open=sum(item.open_count for item in items),
+        must_open=int(must_open),
+        warn_open=int(warn_open),
+        products_with_open=int(products_open),
+    )
 
 
 @router.get("/issues", response_model=list[IssueOut])
@@ -38,6 +55,7 @@ def list_issues(
     status: str | None = None,
     level: str | None = None,
     shop_id: int | None = None,
+    product_id: int | None = None,
     session: Session = Depends(get_db),
 ) -> list[IssueOut]:
     if status is not None and status not in {"open", "resolved", "ignored"}:
@@ -56,6 +74,8 @@ def list_issues(
         stmt = stmt.where(Issue.level == level)
     if shop_id is not None:
         stmt = stmt.where(Product.shop_id == shop_id)
+    if product_id is not None:
+        stmt = stmt.where(Issue.product_id == product_id)
     return [_issue_out(issue) for issue in session.scalars(stmt).unique().all()]
 
 
