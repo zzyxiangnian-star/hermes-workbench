@@ -20,6 +20,9 @@ EXPECTED_TOOLS = {
     "wb_check_compliance",
     "wb_get_product_card",
     "wb_get_brand_guide",
+    "wb_list_contents",
+    "wb_get_content",
+    "wb_create_draft",
 }
 
 
@@ -72,7 +75,7 @@ def test_tool_list_is_read_only_plus_note(client):
         assert tool["description"], tool["name"]
         assert any("一" <= ch <= "鿿" for ch in tool["description"]), tool["name"]
     forbidden = ("status", "rule", "import", "send", "price", "delete", "update", "patch", "set")
-    for name in names - {"wb_add_note"}:
+    for name in names - {"wb_add_note", "wb_create_draft"}:
         assert not any(word in name for word in forbidden), name
     note_params = set(next(t for t in tools if t["name"] == "wb_add_note")["inputSchema"]["properties"])
     assert note_params == {"issue_id", "note"}
@@ -245,3 +248,35 @@ def test_bot_configs_only_name_existing_tools(client):
         include = data["mcp_servers"]["hermes-workbench"]["tools"]["include"]
         assert set(include) <= names, config
         assert {"terminal", "browser"} <= set(data["agent"]["disabled_toolsets"]), config
+
+
+def test_create_draft_stays_draft(client):
+    failed, data = call(
+        client,
+        "wb_create_draft",
+        title="双 11 文案",
+        brand="星年",
+        body="很好的电饭煲",
+        kind="note",
+        variants=[{"platform": "xiaohongshu", "body": "姐妹们看过来"}],
+    )
+    assert not failed, data
+    assert data["status"] == "draft"
+    assert data["platforms"] == ["xiaohongshu"]
+    detail = client.get(f"/api/contents/{data['id']}").json()
+    assert detail["author"] == "品牌助手"
+    assert detail["versions"][0]["note"] == "品牌助手起草"
+
+    failed, message = call(client, "wb_create_draft", title="x", brand="y", body="z", kind="bad")
+    assert failed and "参数不正确" in message
+    failed, message = call(client, "wb_create_draft", title="x", brand="y", body="z", variants=[{"platform": "facebook"}])
+    assert failed and "参数不正确" in message
+
+    failed, got = call(client, "wb_get_content", content_id=data["id"])
+    assert not failed and got["compliance"]["passed"] is True
+    failed, listed = call(client, "wb_list_contents", status="draft")
+    assert not failed and [item["id"] for item in listed["items"]] == [data["id"]]
+    create_params = {
+        t["name"]: set(t["inputSchema"]["properties"]) for t in rpc(client, "tools/list")["result"]["tools"]
+    }["wb_create_draft"]
+    assert "status" not in create_params and "author" not in create_params

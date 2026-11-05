@@ -328,3 +328,102 @@ class CampaignTask(Base):
     note: Mapped[str | None] = mapped_column(Text)
 
     campaign: Mapped[Campaign] = relationship(back_populates="tasks")
+
+
+# ---- C05 品牌活动：内容（稿件、平台版本、版本历史、审稿批注）----
+
+CONTENT_STATUSES = ("draft", "in_review", "approved", "rejected", "published")
+CONTENT_KINDS = ("article", "note", "video_script", "poster_copy", "product_copy")
+PLATFORMS = ("wechat", "xiaohongshu", "douyin", "weibo", "tmall", "jd", "pdd", "other")
+
+
+class Content(Base):
+    __tablename__ = "contents"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft', 'in_review', 'approved', 'rejected', 'published')", name="ck_contents_status"
+        ),
+        CheckConstraint(
+            "kind IN ('article', 'note', 'video_script', 'poster_copy', 'product_copy')", name="ck_contents_kind"
+        ),
+        Index("ix_contents_status", "status"),
+        Index("ix_contents_campaign_id", "campaign_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    brand: Mapped[str] = mapped_column(String(200), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    campaign_id: Mapped[int | None] = mapped_column(ForeignKey("campaigns.id", ondelete="SET NULL"))
+    body: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="draft")
+    author: Mapped[str | None] = mapped_column(String(100))
+    reviewer: Mapped[str | None] = mapped_column(String(100))
+    planned_at: Mapped[date | None] = mapped_column(Date)
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    variants: Mapped[list["ContentVariant"]] = relationship(
+        back_populates="content", cascade="all, delete-orphan", order_by="ContentVariant.id"
+    )
+    versions: Mapped[list["ContentVersion"]] = relationship(
+        back_populates="content", cascade="all, delete-orphan", order_by="ContentVersion.version"
+    )
+    comments: Mapped[list["ContentComment"]] = relationship(
+        back_populates="content", cascade="all, delete-orphan", order_by="ContentComment.id"
+    )
+
+
+class ContentVariant(Base):
+    __tablename__ = "content_variants"
+    __table_args__ = (
+        UniqueConstraint("content_id", "platform", name="uq_content_variants_platform"),
+        CheckConstraint(
+            "platform IN ('wechat', 'xiaohongshu', 'douyin', 'weibo', 'tmall', 'jd', 'pdd', 'other')",
+            name="ck_content_variants_platform",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    content_id: Mapped[int] = mapped_column(ForeignKey("contents.id", ondelete="CASCADE"), nullable=False)
+    platform: Mapped[str] = mapped_column(String(16), nullable=False)
+    title: Mapped[str | None] = mapped_column(String(300))
+    body: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    published_url: Mapped[str | None] = mapped_column(String(1000))
+
+    content: Mapped[Content] = relationship(back_populates="variants")
+
+
+class ContentVersion(Base):
+    __tablename__ = "content_versions"
+    __table_args__ = (UniqueConstraint("content_id", "version", name="uq_content_versions_version"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    content_id: Mapped[int] = mapped_column(ForeignKey("contents.id", ondelete="CASCADE"), nullable=False)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    author: Mapped[str | None] = mapped_column(String(100))
+    note: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    content: Mapped[Content] = relationship(back_populates="versions")
+
+
+class ContentComment(Base):
+    __tablename__ = "content_comments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    content_id: Mapped[int] = mapped_column(ForeignKey("contents.id", ondelete="CASCADE"), nullable=False)
+    platform: Mapped[str | None] = mapped_column(String(16))
+    quote: Mapped[str | None] = mapped_column(Text)
+    start: Mapped[int | None] = mapped_column(Integer)
+    end: Mapped[int | None] = mapped_column(Integer)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    author: Mapped[str | None] = mapped_column(String(100))
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="comment")
+    resolved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    content: Mapped[Content] = relationship(back_populates="comments")

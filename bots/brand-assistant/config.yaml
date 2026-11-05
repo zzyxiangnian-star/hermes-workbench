@@ -16,6 +16,9 @@ mcp_servers:
         - wb_get_brand_guide
         - wb_get_overview
         - wb_get_trend
+        - wb_list_contents
+        - wb_get_content
+        - wb_create_draft
 
 agent:
   # 品牌助手只查资料、查活动和检查文案，不需要执行命令、操作浏览器、跑代码或改本地文件。

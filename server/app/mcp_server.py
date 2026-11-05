@@ -1,4 +1,4 @@
-"""电商助手、品牌助手用的 MCP 工具。只读为主，唯一的写操作是给商品问题追加备注。
+"""电商助手、品牌助手用的 MCP 工具。只读为主；写操作只有两个：给商品问题追加备注、新建稿件草稿。
 
 HTTP：随主服务挂在 /mcp（Streamable HTTP）。
 本地调试：python -m app.mcp_server --stdio
@@ -25,12 +25,16 @@ except ImportError:  # mcp 2.x 把 FastMCP 改名为 MCPServer，HTTP 设置挪�
     from mcp.server.mcpserver.exceptions import ToolError
 
     MCP_V1 = False
+from pydantic import ValidationError
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload, sessionmaker
 
 from app.api.alerts import list_alerts
 from app.api.brand_assets import card_out, get_guide, list_cards
 from app.api.campaigns import _campaign, campaign_detail, list_campaigns
+from app.api.contents import _content, content_detail, create_content, list_contents
+from app.brand_schemas import ContentIn
+from app.contents import compliance_of
 from app.api.issues import _issue_out, list_issues
 from app.api.reports import _report_out
 from app.errors import AppError
@@ -40,13 +44,14 @@ from app.overview import build_overview, build_trend, overview_payload
 from app.reports import build_daily_report, report_day
 
 NOTE_PREFIX = "[电商助手] "
+AI_AUTHOR = "品牌助手"
 MAX_ISSUES = 50
 MAX_NOTE = 500
 
 INSTRUCTIONS = (
     "Hermes 工作台的数据。电商：商品问题、单个商品、经营总览、趋势、投放提醒、日报，可给商品问题追加备注。"
-    "品牌活动：活动日历和复盘、违禁词检查、商品资料卡、品牌规范。"
-    "不能改状态、改规则、导入数据、发日报、改价，也不能新建或修改活动和资料。"
+    "品牌活动：活动日历和复盘、违禁词检查、商品资料卡、品牌规范、稿件，可把文案存成新草稿。"
+    "不能改状态、改规则、导入数据、发日报、改价，不能送审、通过或发布稿件，也不能新建或修改活动和资料。"
 )
 
 
@@ -307,7 +312,81 @@ def build_mcp(session_factory: sessionmaker) -> Any:
     def wb_get_brand_guide(brand: str) -> dict[str, Any]:
         return run(lambda session: get_guide(brand=brand or "", session=session))
 
+    # ---- C05 内容 ----
+
+    @mcp.tool(
+        description=(
+            "列出稿件。可按状态（draft 草稿 / in_review 送审中 / approved 已通过 / rejected 被退回 / published 已发布）、"
+            "品牌、活动 campaign_id、平台（wechat、xiaohongshu、douyin、weibo、tmall、jd、pdd、other）、关键词 q 筛选。"
+        )
+    )
+    def wb_list_contents(
+        status: str | None = None,
+        brand: str | None = None,
+        campaign_id: int | None = None,
+        platform: str | None = None,
+        q: str | None = None,
+    ) -> dict[str, Any]:
+        return run(
+            lambda session: {
+                "items": list_contents(
+                    status=status, brand=brand, campaign_id=campaign_id, platform=platform, q=q, session=session
+                )
+            }
+        )
+
+    @mcp.tool(
+        description="查一篇稿件：正文、各平台版本、审稿批注（含退回原因）、版本列表，以及当前的违禁词检查结果。改稿前先看批注。"
+    )
+    def wb_get_content(content_id: int) -> dict[str, Any]:
+        def query(session: Session) -> dict:
+            content = _content(session, content_id)
+            return {"content": content_detail(session, content), "compliance": compliance_of(session, content)}
+
+        return run(query)
+
+    @mcp.tool(
+        description=(
+            "把写好的文案存成工作台里的一篇新草稿，作者记为“品牌助手”，状态固定是草稿，由人修改、送审和发布。"
+            "kind 取 article 长文、note 短文/笔记、video_script 视频脚本、poster_copy 海报文案、product_copy 商品文案。"
+            "variants 是各平台版本，例如 [{\"platform\": \"xiaohongshu\", \"title\": \"…\", \"body\": \"…\"}]。"
+            "保存前请先用 wb_check_compliance 检查。"
+        )
+    )
+    def wb_create_draft(
+        title: str,
+        brand: str,
+        body: str,
+        kind: str = "article",
+        campaign_id: int | None = None,
+        variants: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        try:
+            payload = ContentIn(
+                title=title,
+                brand=brand,
+                body=body,
+                kind=kind,
+                campaign_id=campaign_id,
+                variants=variants or [],
+                author=AI_AUTHOR,
+                note="品牌助手起草",
+            )
+        except ValidationError as exc:
+            raise ToolFailure("参数不正确：" + "; ".join(_short_error(err) for err in exc.errors())) from exc
+
+        def write(session: Session) -> Any:
+            detail = create_content(payload=payload, session=session)
+            return {"id": detail.id, "status": detail.status, "version": detail.version, "platforms": detail.platforms}
+
+        return run(write)
+
     return mcp
+
+
+def _short_error(error: dict) -> str:
+    loc = ".".join(str(item) for item in error.get("loc", []))
+    return f"{loc} {error.get('msg', '')}".strip()
 
 
 def _product_detail(session: Session, product: Product) -> dict:

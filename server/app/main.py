@@ -43,6 +43,10 @@ _VALIDATION_MESSAGES = {
     "due_date": "截止日期格式应为 YYYY-MM-DD",
     "target_sales": "目标销售额不能是负数",
     "budget": "预算不能是负数",
+    "body": "正文不能为空，最多 5 万字",
+    "planned_at": "计划日期格式应为 YYYY-MM-DD",
+    "resolved": "请说明是否已解决",
+    "url": "链接太长",
 }
 
 
@@ -114,6 +118,8 @@ def _validation_message(exc: RequestValidationError) -> str:
         return "请求参数不正确"
     loc = [str(item) for item in errors[0].get("loc", []) if item not in {"body", "query", "path", "form"}]
     field = loc[-1] if loc else ""
+    if field == "platform" and "variants" in loc:
+        return "平台必须是 wechat、xiaohongshu、douyin、weibo、tmall、jd、pdd 或 other"
     return _VALIDATION_MESSAGES.get(field, "请求参数不正确")
 
 

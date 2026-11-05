@@ -299,3 +299,165 @@ class CampaignReviewOut(BaseModel):
     tasks_done: int
     shops: list[ShopSales]
     markdown: str
+
+
+# ---- C05 内容 ----
+
+Platform = Literal["wechat", "xiaohongshu", "douyin", "weibo", "tmall", "jd", "pdd", "other"]
+ContentKind = Literal["article", "note", "video_script", "poster_copy", "product_copy"]
+
+
+class VariantIn(BaseModel):
+    platform: Platform
+    title: str | None = None
+    body: str = Field(default="", max_length=50000)
+
+    _c = field_validator("title")(lambda cls, v: _clean(v))
+
+
+class VariantOut(APIModel):
+    platform: str
+    title: str | None
+    body: str
+    published_url: str | None
+
+
+class ContentIn(BaseModel):
+    title: str
+    brand: str
+    kind: ContentKind = "article"
+    campaign_id: int | None = None
+    body: str = Field(default="", max_length=50000)
+    author: str | None = None
+    planned_at: date | None = None
+    variants: list[VariantIn] = Field(default_factory=list)
+    note: str | None = None
+
+    _r = field_validator("title", "brand")(lambda cls, v: _required(v))
+    _c = field_validator("author", "note")(lambda cls, v: _clean(v))
+
+
+class ContentUpdate(BaseModel):
+    title: str | None = None
+    kind: ContentKind | None = None
+    campaign_id: int | None = None
+    body: str | None = Field(default=None, max_length=50000)
+    planned_at: date | None = None
+    variants: list[VariantIn] | None = None
+    author: str | None = None
+    note: str | None = None
+
+    _c = field_validator("author", "note")(lambda cls, v: _clean(v))
+
+
+class ContentOut(BaseModel):
+    id: int
+    title: str
+    brand: str
+    kind: str
+    campaign_id: int | None
+    campaign_name: str | None
+    status: str
+    author: str | None
+    reviewer: str | None
+    planned_at: date | None
+    published_at: UtcDateTime | None
+    version: int
+    platforms: list[str]
+    open_comments: int
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
+
+
+class CommentIn(BaseModel):
+    body: str
+    platform: Platform | None = None
+    quote: str | None = None
+    start: int | None = Field(default=None, ge=0)
+    end: int | None = Field(default=None, ge=0)
+    author: str | None = None
+
+    _r = field_validator("body")(lambda cls, v: _required(v))
+    _c = field_validator("author", "quote")(lambda cls, v: _clean(v))
+
+
+class CommentOut(APIModel):
+    id: int
+    content_id: int
+    platform: str | None
+    quote: str | None
+    start: int | None
+    end: int | None
+    body: str
+    author: str | None
+    kind: str
+    resolved: bool
+    created_at: UtcDateTime
+
+
+class CommentPatch(BaseModel):
+    resolved: bool
+
+
+class VersionInfo(APIModel):
+    version: int
+    author: str | None
+    note: str | None
+    created_at: UtcDateTime
+
+
+class ContentDetail(ContentOut):
+    body: str
+    variants: list[VariantOut]
+    comments: list[CommentOut]
+    versions: list[VersionInfo]
+
+
+class ReviewAction(BaseModel):
+    by: str | None = None
+    note: str | None = None
+
+    _c = field_validator("by", "note")(lambda cls, v: _clean(v))
+
+
+class PublishAction(BaseModel):
+    by: str | None = None
+    platform: Platform | None = None
+    url: str | None = Field(default=None, max_length=1000)
+
+    _c = field_validator("by", "url")(lambda cls, v: _clean(v))
+
+
+class PartCompliance(BaseModel):
+    platform: str | None
+    result: ComplianceOut
+
+
+class ContentCompliance(BaseModel):
+    passed: bool
+    must_count: int
+    warn_count: int
+    parts: list[PartCompliance]
+
+
+class DiffSegment(BaseModel):
+    op: Literal["equal", "insert", "delete"]
+    text: str
+
+
+class ContentDiff(BaseModel):
+    content_id: int
+    from_version: int
+    to_version: int
+    platform: str | None
+    title_from: str | None
+    title_to: str | None
+    segments: list[DiffSegment]
+
+
+class VersionSnapshot(APIModel):
+    version: int
+    author: str | None
+    note: str | None
+    created_at: UtcDateTime
+    snapshot: dict

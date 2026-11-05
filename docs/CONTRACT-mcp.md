@@ -1,4 +1,4 @@
-# 工作台 MCP 工具约定（C03、C04）
+# 工作台 MCP 工具约定（C03–C05）
 
 - 服务名：`hermes-workbench`
 - HTTP：随后端一起启动，`http://127.0.0.1:8000/mcp`（Streamable HTTP，无状态，JSON 响应）。只接受 Host 为 `127.0.0.1` / `localhost` 的请求，其他 Host 返回 421。
@@ -23,15 +23,21 @@
 | `wb_get_product_card` | `product_code` 精确，或 `q` 模糊（最多 10 个） | `{items: 资料卡[]}` | `GET /api/product-cards` |
 | `wb_get_brand_guide` | `brand` | 品牌规范 | `GET /api/brand-guides/{brand}` |
 
-后 5 个（C04）给品牌助手用，全部只读；字段见 [CONTRACT-brand.md](CONTRACT-brand.md)。
+| `wb_list_contents` | `status`、`brand`、`campaign_id`、`platform`、`q` | `{items: 稿件[]}` | `GET /api/contents` |
+| `wb_get_content` | `content_id` | `{content: 稿件详情, compliance: 合规检查}` | `GET /api/contents/{id}` + `/compliance` |
+| `wb_create_draft` | `title`、`brand`、`body`、`kind`=article、`campaign_id`、`variants[{platform,title,body}]` | `{id, status:"draft", version, platforms}` | `POST /api/contents` |
+
+C04、C05 的 8 个给品牌助手用，字段见 [CONTRACT-brand.md](CONTRACT-brand.md)。`wb_create_draft` 只能新建，作者固定为“品牌助手”，状态固定为草稿，没有改作者或状态的参数；送审、通过、发布只在工作台里由人操作。
 
 `IssueOut`、`AlertOut`、总览、趋势的字段见 [CONTRACT-products.md](CONTRACT-products.md) 和 [CONTRACT-overview.md](CONTRACT-overview.md)。
 
-## `wb_add_note` 的规矩
+## 写操作的规矩
+
+### `wb_add_note`
 
 - 备注前面自动加 `[电商助手] `，接在原备注下一行，不覆盖。
 - 不改 `status`，不改 `resolved_at`。多传的参数（例如 `status`）不起作用。
 
 ## 故意不做成工具的
 
-改问题或提醒的状态、改规则和投放规则、导入表格、发送日报、改价；新建或修改活动、任务、资料卡、品牌规范、违禁词。这些都由人在工作台里操作。测试 `test_tool_list_is_read_only_plus_note` 会在有人加了这类工具时失败。
+改问题或提醒的状态、改规则和投放规则、导入表格、发送日报、改价；新建或修改活动、任务、资料卡、品牌规范、违禁词；修改已有稿件、送审、审核、标记发布。这些都由人在工作台里操作。测试 `test_tool_list_is_read_only_plus_note` 会在有人加了这类工具时失败。

@@ -1,8 +1,8 @@
-# 品牌活动：资料和活动（C04）
+# 品牌活动：资料、活动和内容（C04、C05）
 
-给品牌活动工作台的「活动」「资料」两页用。路径前缀 `/api`，错误格式、金额和时间格式与 `docs/CONTRACT-products.md` 相同。下面的例子来自导入 `samples/metrics-tmall.xlsx`、`samples/ad-spend-tmall.xlsx` 到「星年天猫旗舰店」之后的真实返回，时间戳会变。
+给品牌活动工作台的「活动」「内容」「资料」三页用。路径前缀 `/api`，错误格式、金额和时间格式与 `docs/CONTRACT-products.md` 相同。下面的例子来自导入 `samples/metrics-tmall.xlsx`、`samples/ad-spend-tmall.xlsx` 到「星年天猫旗舰店」之后的真实返回，时间戳会变。
 
-「内容」页（稿件、一稿多平台、审稿）的接口在下一张卡（C05）做；这里的合规检查它会复用。
+「内容」页（稿件、一稿多平台、审稿）的接口见文末“内容（C05）”。
 
 ## 品牌规范
 
@@ -98,4 +98,53 @@ GET /api/campaigns/1/review   （活动 2026-11-04 单日，目标 24000，预�
    "tasks_total":5,"tasks_done":0,
    "shops":[{"shop_id":1,"shop_name":"星年天猫旗舰店","platform":"tmall","sales_amount":12000.0,"orders":60,"ad_spend":1300.0,"roi":2.1154}],
    "markdown":"# 活动复盘：单日测试\n…"}
+```
+
+## 内容（C05）
+
+稿件有一份主稿（`title`、`body`）和若干平台版本（`variants`，每个平台最多一份）。平台：`wechat` 公众号、`xiaohongshu`、`douyin`、`weibo`、`tmall`、`jd`、`pdd`、`other`。类型 `kind`：`article` 长文、`note` 短文/笔记、`video_script` 视频脚本、`poster_copy` 海报文案、`product_copy` 商品文案。
+
+### 流转
+
+```
+draft / rejected ──submit──▶ in_review ──approve──▶ approved ──publish──▶ published
+                             in_review ──reject───▶ rejected（必须写原因）
+           in_review / approved ──withdraw──▶ draft
+```
+
+- 只有 `draft`、`rejected` 能改（`PUT`）；其他状态改会 409 `content_locked`。不允许的流转 409 `invalid_transition`。
+- `rejected` 的稿件改过之后回到 `draft`。
+- **送审前自动做合规检查**：主稿和每个平台版本（标题 + 正文）有 must 级违禁词就 400 `compliance_failed`，`message` 里列出要改的词。
+- 发布由人在平台上完成后回来标记：`POST /publish {platform?, url?, by?}`，可以每个平台各标一次并记链接；第一次标记时状态变 `published` 并记 `published_at`。
+- 每个审稿动作（送审、撤回、通过、退回、发布）都记一条 `kind="review"`、已解决的批注，抽屉里能看到谁在什么时候做了什么。
+
+### 接口
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/contents?status=&brand=&campaign_id=&platform=&q=` | 列表，按更新时间倒序；`q` 搜标题、正文和平台版本 |
+| POST | `/contents` | `{title, brand, kind, campaign_id?, body, author?, planned_at?, variants[], note?}` → 详情，版本 1 |
+| GET | `/contents/{id}` | 详情 |
+| PUT | `/contents/{id}` | 只传要改的字段；`variants` 传了就整体替换。内容有变化才记新版本，`note` 是这次改动说明 |
+| DELETE | `/contents/{id}` | 204 |
+| GET | `/contents/{id}/compliance` | `{passed, must_count, warn_count, parts:[{platform, result}]}`，`platform=null` 是主稿 |
+| POST | `/contents/{id}/submit` · `/withdraw` · `/approve` · `/reject` | `{by?, note?}`；`reject` 必须有 `note` |
+| POST | `/contents/{id}/publish` | `{platform?, url?, by?}` |
+| POST | `/contents/{id}/comments` | `{body, platform?, quote?, start?, end?, author?}`；`start/end` 是字符下标 |
+| PATCH | `/content-comments/{id}` | `{resolved}` |
+| DELETE | `/content-comments/{id}` | 204 |
+| GET | `/contents/{id}/versions/{v}` | `{version, author, note, created_at, snapshot:{title, kind, body, variants[]}}` |
+| GET | `/contents/{id}/diff?from_version=&to_version=&platform=` | 版本对比；`to_version` 默认当前版本，`platform` 不传是主稿 |
+
+列表项：`id, title, brand, kind, campaign_id, campaign_name, status, author, reviewer, planned_at, published_at, version, platforms[], open_comments, created_at, updated_at`。`open_comments` 只算人写的未解决批注。详情多 `body, variants[{platform,title,body,published_url}], comments[], versions[{version,author,note,created_at}]`。
+
+### 版本对比
+
+先按行比，改动的行块再按字比（中文没有空格，按字才看得出改了哪几个字）。`segments` 依次拼起来：去掉 `insert` 是旧文，去掉 `delete` 是新文。
+
+```json
+GET /api/contents/1/diff?from_version=1
+→ {"content_id":1,"from_version":1,"to_version":2,"platform":null,"title_from":"双 11 电饭煲推荐","title_to":"双 11 电饭煲推荐",
+   "segments":[{"op":"equal","text":"第一段：IH 加热，米饭更"},{"op":"delete","text":"香"},{"op":"insert","text":"软糯"},
+               {"op":"equal","text":"。\n第二段：24 小时预约。\n"},{"op":"insert","text":"第三段：一年保修。\n"}]}
 ```
