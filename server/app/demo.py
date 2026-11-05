@@ -77,6 +77,7 @@ def build(db_path: Path) -> dict:
         _metrics_and_ads(api, shops, rng, start, end)
         _brand(api, rng, end)
         _orders(api, shops, rng, end)
+        _customers(api, shops, rng, end)
         summary = {
             "数据库": str(db_path),
             "日期范围": f"{start} 至 {end}",
@@ -86,6 +87,8 @@ def build(db_path: Path) -> dict:
             "活动": len(api.get("/api/campaigns")),
             "稿件": len(api.get("/api/contents")),
             "安装工单": len(api.get("/api/installs")),
+            "客户": api.get("/api/customers/segments")["total"],
+            "询盘": len(api.get("/api/inquiries")),
         }
     return summary
 
@@ -376,6 +379,83 @@ def _orders(api: _Api, shops: dict, rng: random.Random, end: date) -> None:
         api.post(f"/api/installs/{first['id']}/status", {"status": "booked", "appointment_at": when, "engineer": "刘师傅", "provider_ref": "ZMN-DEMO-1", "by": "客服小周"})
         api.post(f"/api/installs/{second['id']}/status", {"status": "exception", "reason": "顾客说墙体是空心砖，需要先确认能否打孔", "by": "客服小周"})
         api.post(f"/api/installs/{third['id']}/notes", {"note": "顾客要求带防尘罩", "by": "客服小周"})
+
+
+def _customers(api: _Api, shops: dict, rng: random.Random, end: date) -> None:
+    """老客的历史订单（复购、沉睡）、几个加了企微的客户、B 端询盘和报价单、一个待审的沉睡唤醒任务。"""
+    header = ["订单编号", "付款时间", "商家编码", "货号", "商品标题", "购买数量", "实付金额", "收货人姓名", "联系手机", "收货地址", "买家留言", "订单状态"]
+    small = [p for p in XINGNIAN_PRODUCTS if not p[4]]
+    recent = api.get("/api/customers", {"page_size": 200})["items"]
+    rows = [header]
+    # 最近买过的人里挑 5 个，补一笔两三个月前的订单 → 复购
+    for n, customer in enumerate(recent[:5]):
+        code, title, price, _floor, _install = rng.choice(small)
+        day = end - timedelta(days=rng.randint(40, 80))
+        rows.append([f"H{day:%Y%m%d}{n:04d}", f"{day} 20:15:00", f"TM-{code}", code, title, 1, price, customer["name"], customer["phone"], f"{rng.choice(CITIES)}演示路 {n + 1} 号", "", "交易成功"])
+    # 8 个半年前买过、之后没再买的 → 沉睡
+    for n in range(8):
+        code, title, price, _floor, _install = rng.choice(small)
+        day = end - timedelta(days=rng.randint(100, 200))
+        name = rng.choice(SURNAMES) + rng.choice(["先生", "女士"])
+        rows.append([f"S{day:%Y%m%d}{n:04d}", f"{day} 10:30:00", f"TM-{code}", code, title, 1, price, name, f"100{rng.randint(10000000, 99999999)}", f"{rng.choice(CITIES)}演示路 {n + 20} 号", "", "交易成功"])
+    api.upload("/api/import/orders", shops["星年天猫旗舰店"]["id"], "订单-历史.csv", rows)
+
+    everyone = api.get("/api/customers", {"page_size": 200})["items"]
+    for customer in everyone[::3]:
+        api.patch(f"/api/customers/{customer['id']}", {"wecom_added": True})
+
+    hotel = api.post(
+        "/api/inquiries",
+        {
+            "channel": "wecom",
+            "company": "演示酒店管理有限公司",
+            "contact": "陈经理",
+            "phone": "10012345678",
+            "content": "我们新开的酒店有 40 间客房，想统一换 1.5 匹挂机，需要含安装、开增值税专票，月底前装完。",
+            "product_codes": ["XN-AC35"],
+            "assignee": "销售小王",
+            "by": "销售小王",
+        },
+    )
+    api.post(f"/api/inquiries/{hotel['id']}/status", {"status": "replied", "by": "销售小王"})
+    api.post(
+        f"/api/inquiries/{hotel['id']}/quotes",
+        {
+            "items": [
+                {"product_code": "XN-AC35", "name": "星年 一级能效变频空调 1.5 匹 挂机", "quantity": 40, "unit_price": 2650},
+                {"name": "标准安装（含 3 米铜管）", "quantity": 40, "unit_price": 0, "note": "批量订单免安装费"},
+            ],
+            "terms": "含税含运费；签约后 7 天内分批到货安装；到货验收后 30 日内付清。",
+            "by": "销售小王",
+        },
+    )
+    api.post(
+        "/api/inquiries",
+        {
+            "channel": "phone",
+            "company": "演示物业服务公司",
+            "contact": "刘主管",
+            "content": "小区活动室要 3 台除湿机、5 台落地扇，问团购价和发票。",
+            "product_codes": ["XN-DH20", "XN-FN40"],
+            "assignee": "销售小王",
+        },
+    )
+    school = api.post(
+        "/api/inquiries",
+        {"channel": "email", "company": "演示培训学校", "contact": "赵老师", "content": "教师宿舍要 12 台电热水器 60L。", "product_codes": ["XN-WH60"]},
+    )
+    api.post(f"/api/inquiries/{school['id']}/status", {"status": "lost", "reason": "对方选了本地经销商，价格差 8%", "by": "销售小王"})
+
+    api.post(
+        "/api/followups",
+        {
+            "name": "沉睡客户唤醒（企微）",
+            "segment": "dormant",
+            "channel": "wecom",
+            "template": "{称呼}您好，之前您在{店铺}买的{最近商品}用得怎么样？最近有以旧换新活动，有需要可以直接回我。",
+            "by": "运营小林",
+        },
+    )
 
 
 def main() -> None:

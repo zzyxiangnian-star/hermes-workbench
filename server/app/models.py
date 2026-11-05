@@ -440,6 +440,7 @@ class Order(Base):
         UniqueConstraint("shop_id", "order_no", "sku", name="uq_orders_shop_no_sku"),
         Index("ix_orders_shop_id", "shop_id"),
         Index("ix_orders_paid_at", "paid_at"),
+        Index("ix_orders_customer_id", "customer_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -456,6 +457,7 @@ class Order(Base):
     address: Mapped[str | None] = mapped_column(String(500))
     remark: Mapped[str | None] = mapped_column(Text)
     platform_status: Mapped[str | None] = mapped_column(String(50))
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     shop: Mapped[Shop] = relationship()
@@ -487,3 +489,121 @@ class InstallOrder(Base):
 
     order: Mapped[Order] = relationship()
     shop: Mapped[Shop] = relationship()
+
+
+# ---- C08 客户：客户档案、询盘、报价、会员跟进 ----
+
+INQUIRY_STATUSES = ("new", "replied", "quoted", "won", "lost")
+INQUIRY_CHANNELS = ("wecom", "phone", "tmall", "jd", "pdd", "douyin", "email", "other")
+FOLLOWUP_CHANNELS = ("wecom", "platform", "sms", "phone")
+
+
+class Customer(Base):
+    __tablename__ = "customers"
+    __table_args__ = (
+        UniqueConstraint("phone", name="uq_customers_phone"),
+        CheckConstraint("kind IN ('member', 'business')", name="ck_customers_kind"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False, default="member")
+    name: Mapped[str | None] = mapped_column(String(100))
+    phone: Mapped[str | None] = mapped_column(String(40))
+    company: Mapped[str | None] = mapped_column(String(200))
+    wecom_added: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    tags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class Inquiry(Base):
+    __tablename__ = "inquiries"
+    __table_args__ = (
+        CheckConstraint("status IN ('new', 'replied', 'quoted', 'won', 'lost')", name="ck_inquiries_status"),
+        CheckConstraint(
+            "channel IN ('wecom', 'phone', 'tmall', 'jd', 'pdd', 'douyin', 'email', 'other')",
+            name="ck_inquiries_channel",
+        ),
+        Index("ix_inquiries_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    customer_id: Mapped[int | None] = mapped_column(ForeignKey("customers.id", ondelete="SET NULL"))
+    channel: Mapped[str] = mapped_column(String(16), nullable=False)
+    company: Mapped[str | None] = mapped_column(String(200))
+    contact: Mapped[str | None] = mapped_column(String(100))
+    phone: Mapped[str | None] = mapped_column(String(40))
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    product_codes: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="new")
+    assignee: Mapped[str | None] = mapped_column(String(100))
+    lost_reason: Mapped[str | None] = mapped_column(Text)
+    note: Mapped[str | None] = mapped_column(Text)
+    events: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    customer: Mapped[Customer | None] = relationship()
+    quotes: Mapped[list["Quote"]] = relationship(
+        back_populates="inquiry", cascade="all, delete-orphan", order_by="Quote.id"
+    )
+
+
+class Quote(Base):
+    __tablename__ = "quotes"
+    __table_args__ = (UniqueConstraint("number", name="uq_quotes_number"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    inquiry_id: Mapped[int] = mapped_column(ForeignKey("inquiries.id", ondelete="CASCADE"), nullable=False)
+    number: Mapped[str] = mapped_column(String(40), nullable=False)
+    items: Mapped[list] = mapped_column(JSON, nullable=False)
+    total: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    valid_until: Mapped[date | None] = mapped_column(Date)
+    terms: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    inquiry: Mapped[Inquiry] = relationship(back_populates="quotes")
+
+
+class Followup(Base):
+    __tablename__ = "followups"
+    __table_args__ = (
+        CheckConstraint("status IN ('draft', 'approved', 'done', 'cancelled')", name="ck_followups_status"),
+        CheckConstraint("channel IN ('wecom', 'platform', 'sms', 'phone')", name="ck_followups_channel"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    segment: Mapped[str] = mapped_column(String(32), nullable=False)
+    channel: Mapped[str] = mapped_column(String(16), nullable=False)
+    template: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="draft")
+    created_by: Mapped[str | None] = mapped_column(String(100))
+    approved_by: Mapped[str | None] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    targets: Mapped[list["FollowupTarget"]] = relationship(
+        back_populates="followup", cascade="all, delete-orphan", order_by="FollowupTarget.id"
+    )
+
+
+class FollowupTarget(Base):
+    __tablename__ = "followup_targets"
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'sent', 'skipped')", name="ck_followup_targets_status"),
+        UniqueConstraint("followup_id", "customer_id", name="uq_followup_targets_customer"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    followup_id: Mapped[int] = mapped_column(ForeignKey("followups.id", ondelete="CASCADE"), nullable=False)
+    customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id", ondelete="CASCADE"), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    note: Mapped[str | None] = mapped_column(Text)
+
+    followup: Mapped[Followup] = relationship(back_populates="targets")
+    customer: Mapped[Customer] = relationship()

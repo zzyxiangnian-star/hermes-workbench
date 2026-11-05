@@ -50,6 +50,17 @@ _VALIDATION_MESSAGES = {
     "appointment_at": "预约时间格式应为 YYYY-MM-DDTHH:MM",
     "note": "备注不能为空，最多 1000 字",
     "ids": "工单编号不正确",
+    "channel": "渠道不正确",
+    "segment": "分层必须是 new、repeat、dormant 或 inquiry_open",
+    "template": "话术不能为空，最多 2000 字",
+    "content": "询盘内容不能为空，最多 1 万字",
+    "items": "报价单至少要有一行商品",
+    "quantity": "数量必须是大于 0 的整数",
+    "unit_price": "单价不能是负数",
+    "valid_until": "有效期格式应为 YYYY-MM-DD",
+    "phone": "手机号太长",
+    "company": "公司名称太长",
+    "tags": "标签格式不正确",
 }
 
 

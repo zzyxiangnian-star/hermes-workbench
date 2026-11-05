@@ -58,7 +58,8 @@ async def upload_orders(
         "rows_failed": run.rows_failed,
         "errors": run.errors,
         "created_at": run.created_at.astimezone(timezone.utc).isoformat() if run.created_at.tzinfo else run.created_at.isoformat(),
-        "installs": stats,
+        "installs": {"created": stats["created"], "cancelled": stats["cancelled"]},
+        "customers": {"created": stats["customers"]},
     }
 
 

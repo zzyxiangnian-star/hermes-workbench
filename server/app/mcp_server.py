@@ -1,4 +1,4 @@
-"""电商助手、品牌助手用的 MCP 工具。只读为主；写操作只有三个：给商品问题追加备注、给安装工单追加备注、新建稿件草稿。
+"""电商助手、品牌助手用的 MCP 工具。只读为主；写操作只有四个：给商品问题、安装工单、询盘追加备注，新建稿件草稿。
 
 HTTP：随主服务挂在 /mcp（Streamable HTTP）。
 本地调试：python -m app.mcp_server --stdio
@@ -35,6 +35,9 @@ from app.api.campaigns import _campaign, campaign_detail, list_campaigns
 from app.api.contents import _content, content_detail, create_content, list_contents
 from app.api.installs import _install, get_install, install_out, install_summary, list_installs
 from app.installs import add_note as add_install_note
+from app.api.customers import _inquiry, get_customer, get_inquiry, inquiry_detail, inquiry_products
+from app.api.customers import list_customers, list_inquiries, segment_summary
+from app.customers import add_inquiry_note, mask_text
 from app.installs import mask_address, mask_name, mask_phone
 from app.brand_schemas import ContentIn
 from app.contents import compliance_of
@@ -53,9 +56,9 @@ MAX_NOTE = 500
 
 INSTRUCTIONS = (
     "Hermes 工作台的数据。电商：商品问题、单个商品、经营总览、趋势、投放提醒、日报、安装工单（顾客信息已打码），"
-    "可给商品问题和安装工单追加备注。"
+    "客户档案和会员分层、B 端询盘和报价（客户信息已打码），可给商品问题、安装工单和询盘追加备注。"
     "品牌活动：活动日历和复盘、违禁词检查、商品资料卡、品牌规范、稿件，可把文案存成新草稿。"
-    "不能改状态、改规则、导入数据、发日报、改价，不能送审、通过或发布稿件，也不能新建或修改活动和资料。"
+    "不能改状态、改规则、导入数据、发日报、改价，不能建报价单或批量跟进、不能给客户发消息，不能送审、通过或发布稿件，也不能新建或修改活动和资料。"
 )
 
 
@@ -435,7 +438,111 @@ def build_mcp(session_factory: sessionmaker) -> Any:
 
         return run(write)
 
+    # ---- C08 客户（姓名、手机、地址打码后才给 AI）----
+
+    @mcp.tool(
+        description=(
+            "列出客户档案。segment：new 新客（30 天内只买过 1 单）/ repeat 复购（2 单及以上）/ "
+            "dormant 沉睡（最近一单在 90 天前）/ inquiry_open 询盘未成交（超过 7 天没跟进）；"
+            "kind：member 会员 / business 企业客户。返回各分层人数和客户列表，姓名、手机已打码。最多 50 条。"
+        )
+    )
+    def wb_list_customers(
+        segment: str | None = None, kind: str | None = None, q: str | None = None, limit: int = 20
+    ) -> dict[str, Any]:
+        size = max(1, min(int(limit), MAX_ISSUES))
+
+        def query(session: Session) -> dict:
+            page = list_customers(
+                segment=segment, kind=kind, q=q, wecom_added=None, page=1, page_size=size, session=session
+            )
+            summary = segment_summary(session=session)
+            return {
+                "summary": summary,
+                "total": page["total"],
+                "items": [_masked_customer(item) for item in page["items"]],
+            }
+
+        return run(query)
+
+    @mcp.tool(description="查一个客户：分层、累计订单和金额、最近买的商品、最近 50 笔订单、询盘。姓名、手机已打码。")
+    def wb_get_customer(customer_id: int) -> dict[str, Any]:
+        def query(session: Session) -> dict:
+            detail = get_customer(customer_id=customer_id, session=session)
+            return {
+                **_masked_customer(detail),
+                "inquiries": [_masked_inquiry(item) for item in detail["inquiries"]],
+            }
+
+        return run(query)
+
+    @mcp.tool(
+        description=(
+            "列出 B 端询盘。status：open 未关闭 / new 新询盘 / replied 已回复 / quoted 已报价 / won 成交 / lost 丢单；"
+            "stale=true 表示超过 7 天没动静。联系人和手机已打码。最多 50 条。"
+        )
+    )
+    def wb_list_inquiries(status: str | None = None, q: str | None = None, limit: int = 20) -> dict[str, Any]:
+        size = max(1, min(int(limit), MAX_ISSUES))
+
+        def query(session: Session) -> dict:
+            items = list_inquiries(status=status, channel=None, q=q, customer_id=None, session=session)
+            return {"total": len(items), "items": [_masked_inquiry(item) for item in items[:size]]}
+
+        return run(query)
+
+    @mcp.tool(
+        description=(
+            "查一条询盘：原文、提到的商品的资料卡（卖点、参数、FAQ、各店售价库存）、已出的报价单、处理记录。"
+            "可据此起草回复和报价建议，交给销售确认后由人发出。联系人和手机已打码。"
+        )
+    )
+    def wb_get_inquiry(inquiry_id: int) -> dict[str, Any]:
+        def query(session: Session) -> dict:
+            detail = get_inquiry(inquiry_id=inquiry_id, session=session)
+            return {**_masked_inquiry(detail), "products": inquiry_products(inquiry_id=inquiry_id, session=session)}
+
+        return run(query)
+
+    @mcp.tool(
+        description=(
+            "给询盘追加一条备注（例如回复草稿、报价建议、客户关注点）。"
+            f"会加“{NOTE_PREFIX.strip()}”前缀，不改询盘状态，不会发给客户。单次最多 {MAX_NOTE} 字。"
+        )
+    )
+    def wb_add_inquiry_note(inquiry_id: int, note: str) -> dict[str, Any]:
+        text = (note or "").strip()
+        if not text:
+            raise ToolFailure("备注不能为空")
+        if len(text) > MAX_NOTE:
+            raise ToolFailure(f"备注最多 {MAX_NOTE} 字")
+
+        def write(session: Session) -> Any:
+            item = _inquiry(session, inquiry_id)
+            add_inquiry_note(item, "电商助手", NOTE_PREFIX + text)
+            session.flush()
+            return _masked_inquiry(inquiry_detail(item))
+
+        return run(write)
+
     return mcp
+
+
+def _masked_customer(item: dict) -> dict:
+    """客户发给模型前打码；订单只留商品和金额。"""
+    masked = {**item, "name": mask_name(item.get("name")), "phone": mask_phone(item.get("phone")), "note": mask_text(item.get("note"))}
+    masked.pop("inquiries", None)
+    return masked
+
+
+def _masked_inquiry(item: dict) -> dict:
+    return {
+        **item,
+        "contact": mask_name(item.get("contact")),
+        "phone": mask_phone(item.get("phone")),
+        "content": mask_text(item.get("content")),
+        "note": mask_text(item.get("note")),
+    }
 
 
 def _masked(item: dict) -> dict:

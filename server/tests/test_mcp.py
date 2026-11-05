@@ -26,6 +26,11 @@ EXPECTED_TOOLS = {
     "wb_list_installs",
     "wb_get_install",
     "wb_add_install_note",
+    "wb_list_customers",
+    "wb_get_customer",
+    "wb_list_inquiries",
+    "wb_get_inquiry",
+    "wb_add_inquiry_note",
 }
 
 
@@ -78,7 +83,7 @@ def test_tool_list_is_read_only_plus_note(client):
         assert tool["description"], tool["name"]
         assert any("一" <= ch <= "鿿" for ch in tool["description"]), tool["name"]
     forbidden = ("status", "rule", "import", "send", "price", "delete", "update", "patch", "set")
-    for name in names - {"wb_add_note", "wb_create_draft", "wb_add_install_note"}:
+    for name in names - {"wb_add_note", "wb_create_draft", "wb_add_install_note", "wb_add_inquiry_note"}:
         assert not any(word in name for word in forbidden), name
     note_params = set(next(t for t in tools if t["name"] == "wb_add_note")["inputSchema"]["properties"])
     assert note_params == {"issue_id", "note"}
@@ -311,3 +316,40 @@ def test_install_tools_mask_customer_info(client):
     assert full["phone"] == "13812345678"
     failed, message = call(client, "wb_add_install_note", install_id=999, note="x")
     assert failed and "工单不存在" in message
+
+
+def test_customer_tools_mask_contact_info(client):
+    from test_installs import AC, KETTLE, orders_csv, setup
+
+    shop = setup(client)
+    upload_to(client, "/api/import/orders", shop["id"], "o.csv", orders_csv(AC, KETTLE))
+    inquiry = client.post(
+        "/api/inquiries",
+        json={"channel": "wecom", "company": "某酒店", "contact": "陈经理", "phone": "13600001111", "content": "要 40 台空调，回电 13600001111", "product_codes": ["XN-AC35"]},
+    ).json()
+
+    failed, data = call(client, "wb_list_customers")
+    assert not failed, data
+    assert data["total"] == 3
+    assert {s["segment"] for s in data["summary"]["segments"]} == {"new", "repeat", "dormant", "inquiry_open"}
+    dumped = json.dumps(data, ensure_ascii=False)
+    assert "13812345678" not in dumped and "张三" not in dumped
+    zhang = next(c for c in data["items"] if c["name"] == "张*")
+    assert zhang["phone"] == "138****5678"
+
+    failed, detail = call(client, "wb_get_customer", customer_id=inquiry["customer_id"])
+    assert not failed, detail
+    assert detail["company"] == "某酒店" and detail["inquiries"][0]["contact"] == "陈**"
+    assert "13600001111" not in json.dumps(detail, ensure_ascii=False)
+
+    failed, listed = call(client, "wb_list_inquiries", status="open")
+    assert not failed and listed["items"][0]["content"] == "要 40 台空调，回电 136****1111"
+    failed, one = call(client, "wb_get_inquiry", inquiry_id=inquiry["id"])
+    assert not failed and one["products"]["cards"][0]["product_code"] == "XN-AC35"
+    assert "13600001111" not in json.dumps(one, ensure_ascii=False)
+
+    failed, noted = call(client, "wb_add_inquiry_note", inquiry_id=inquiry["id"], note="客户关心专票和安装周期，建议先报含安装价")
+    assert not failed and noted["status"] == "new"
+    assert noted["note"].startswith("[电商助手] ")
+    failed, message = call(client, "wb_list_customers", segment="bad")
+    assert failed and "分层" in message

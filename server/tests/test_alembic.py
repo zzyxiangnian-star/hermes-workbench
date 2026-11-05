@@ -24,6 +24,13 @@ EXPECTED_TABLES = {
     "product_cards",
     "campaigns",
     "campaign_tasks",
+    "orders",
+    "install_orders",
+    "customers",
+    "inquiries",
+    "quotes",
+    "followups",
+    "followup_targets",
     "alembic_version",
 }
 

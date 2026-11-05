@@ -31,6 +31,14 @@
 | `wb_get_install` | `install_id` | 工单详情含处理记录（打码） | `GET /api/installs/{id}` |
 | `wb_add_install_note` | `install_id`、`note`（1–500 字） | 工单详情（打码） | `POST /api/installs/{id}/notes` |
 
+| `wb_list_customers` | `segment`、`kind`、`q`、`limit`=20（最多 50） | `{summary: 分层人数, total, items: 客户[]}`（打码） | `GET /api/customers` + `/segments` |
+| `wb_get_customer` | `customer_id` | 客户详情含最近订单和询盘（打码） | `GET /api/customers/{id}` |
+| `wb_list_inquiries` | `status`（含 `open`）、`q`、`limit` | `{total, items: 询盘[]}`（打码） | `GET /api/inquiries` |
+| `wb_get_inquiry` | `inquiry_id` | 询盘详情 + `products`（资料卡）（打码） | `GET /api/inquiries/{id}` + `/products` |
+| `wb_add_inquiry_note` | `inquiry_id`、`note`（1–500 字） | 询盘详情（打码） | `POST /api/inquiries/{id}/notes` |
+
+C08 的 5 个也给电商助手用，字段见 [CONTRACT-customers.md](CONTRACT-customers.md)。姓名和联系人只留姓、手机留前三后四，询盘原文和备注里的手机号也打码。
+
 C07 的 3 个给电商助手用，字段见 [CONTRACT-installs.md](CONTRACT-installs.md)。顾客姓名、手机、地址在返回前打码；备注加 `[电商助手] ` 前缀、不改状态。
 
 C04、C05 的 8 个给品牌助手用，字段见 [CONTRACT-brand.md](CONTRACT-brand.md)。`wb_create_draft` 只能新建，作者固定为“品牌助手”，状态固定为草稿，没有改作者或状态的参数；送审、通过、发布只在工作台里由人操作。
@@ -46,4 +54,4 @@ C04、C05 的 8 个给品牌助手用，字段见 [CONTRACT-brand.md](CONTRACT-b
 
 ## 故意不做成工具的
 
-改问题或提醒的状态、改规则和投放规则、导入表格、发送日报、改价；新建或修改活动、任务、资料卡、品牌规范、违禁词；修改已有稿件、送审、审核、标记发布；改安装工单状态、导出预约表、生成顾客通知。这些都由人在工作台里操作。测试 `test_tool_list_is_read_only_plus_note` 会在有人加了这类工具时失败。
+改问题或提醒的状态、改规则和投放规则、导入表格、发送日报、改价；新建或修改活动、任务、资料卡、品牌规范、违禁词；修改已有稿件、送审、审核、标记发布；改安装工单状态、导出预约表、生成顾客通知；改询盘状态、出报价单、建或审核批量跟进、导出跟进名单、标记已发。这些都由人在工作台里操作。测试 `test_tool_list_is_read_only_plus_note` 会在有人加了这类工具时失败。

@@ -20,6 +20,11 @@ mcp_servers:
         - wb_list_installs
         - wb_get_install
         - wb_add_install_note
+        - wb_list_customers
+        - wb_get_customer
+        - wb_list_inquiries
+        - wb_get_inquiry
+        - wb_add_inquiry_note
 
 agent:
   # 电商助手只查数据、写备注，不需要执行命令、操作浏览器、跑代码或改本地文件。

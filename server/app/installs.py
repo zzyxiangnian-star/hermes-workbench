@@ -113,6 +113,9 @@ def import_orders(
     session.flush()
     run = _finish_run(session, file_name, shop_id, "orders", rows_ok, errors)
     stats = sync_installs(session, shop_id=shop_id)
+    from app.customers import sync_customers  # 避免循环引用
+
+    stats["customers"] = sync_customers(session, shop_id=shop_id)["created"]
     return run, stats
 
 
