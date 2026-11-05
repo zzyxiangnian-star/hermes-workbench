@@ -11,26 +11,22 @@ const srcDir = resolve(pluginRoot, 'src')
 const distDir = resolve(pluginRoot, 'dist/hermes-workbench')
 const outFile = resolve(distDir, 'plugin.js')
 
-// Hermes 源码路径（默认 F:\Hermes改造\hermes-agent，或 C:\Users\30882\AppData\Local\hermes\hermes-agent）
-const hermesSrcCandidate = process.env.HERMES_SRC || 'F:\\Hermes改造\\hermes-agent'
-const fallbackHermesSrc = 'C:\\Users\\30882\\AppData\\Local\\hermes\\hermes-agent'
-const hermesRoot = existsSync(hermesSrcCandidate)
-  ? hermesSrcCandidate
-  : existsSync(fallbackHermesSrc)
-    ? fallbackHermesSrc
-    : hermesSrcCandidate
-
+// Hermes 源码：HERMES_SRC，否则默认 F:\Hermes改造\hermes-agent。找不到就退出。
+const hermesRoot = process.env.HERMES_SRC || 'F:\\Hermes改造\\hermes-agent'
 const desktopDir = resolve(hermesRoot, 'apps/desktop')
 const stylesCss = resolve(desktopDir, 'src/styles.css')
 
 console.log(`[build] Hermes 源码路径: ${hermesRoot}`)
-console.log(`[build] Hermes styles.css: ${stylesCss} (存在: ${existsSync(stylesCss)})`)
+
+if (!existsSync(stylesCss)) {
+  console.error(`[build] 找不到 Hermes 样式：${stylesCss}`)
+  console.error('[build] 请设置 HERMES_SRC 指向 hermes-agent，或把源码放在 F:\\Hermes改造\\hermes-agent')
+  process.exit(1)
+}
+
+console.log(`[build] Hermes styles.css: ${stylesCss}`)
 
 async function buildPluginCss() {
-  if (!existsSync(stylesCss)) {
-    console.warn(`[build] 未找到 ${stylesCss}，跳过 Tailwind reference 编译，使用空样式。`)
-    return ''
-  }
 
   const styles = stylesCss.replaceAll('\\', '/')
   const input = `@reference "${styles}";\n@import "tailwindcss/utilities.css" layer(utilities);\n`

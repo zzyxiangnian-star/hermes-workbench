@@ -10,6 +10,7 @@ import {
   syncLocationFromPath,
   toPath
 } from './registry'
+import { restoreWorkbenchPath, watchWorkbenchPath } from './restore'
 import { WorkbenchPage } from './WorkbenchPage'
 import { WorkbenchPane } from './WorkbenchPane'
 
@@ -37,6 +38,11 @@ function setupWorkbenchPlugin(ctx: PluginContext) {
   setNavigator(path => {
     host.navigate(path)
   })
+
+  // 外部插件比内置路由晚加载。刷新时宿主的 path="*" 会先把地址拉回新对话，
+  // 这里用刷新前记下的路径再跳回去。直接粘贴地址打开新窗口没有这份记录，回不来。
+  restoreWorkbenchPath()
+  const stopWatchingPath = watchWorkbenchPath()
 
   // 3. 同步当前路由位置：
   // Hermes SDK (apps/desktop/src/sdk/index.ts) 目前未在 host.state 中暴露当前路由路径 atom，
@@ -93,6 +99,7 @@ function setupWorkbenchPlugin(ctx: PluginContext) {
   }
 
   const cleanup = () => {
+    stopWatchingPath()
     if (typeof window !== 'undefined') {
       window.removeEventListener('hashchange', syncFromWindowHash)
       window.removeEventListener('popstate', syncFromWindowHash)
@@ -109,6 +116,6 @@ function setupWorkbenchPlugin(ctx: PluginContext) {
 export default {
   id: 'hermes-workbench',
   name: '工作台',
-  setup: setupWorkbenchPlugin,
+  description: '电商、品牌活动等部门工作台：左上角“工作台”标签和各业务页面。',
   register: setupWorkbenchPlugin
 }

@@ -1,5 +1,9 @@
 import { Codicon, EmptyState } from '@hermes/plugin-sdk'
+import { ensureOpenIssuePolling, getOpenIssueCount } from '../api/open-count'
+import { ProductsPage } from '../pages/products/ProductsPage'
 import type { WorkbenchDef } from '../types'
+
+ensureOpenIssuePolling()
 
 export const ecommerceWorkbench: WorkbenchDef = {
   id: 'ecommerce',
@@ -24,16 +28,8 @@ export const ecommerceWorkbench: WorkbenchDef = {
       id: 'products',
       label: '商品',
       codicon: 'package',
-      badge: () => 5,
-      render: () => (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState
-            icon={<Codicon name="package" size="1.25rem" />}
-            title="商品"
-            description="每天按规则检查底价、最低价、活动报名和库存，只列出异常。"
-          />
-        </div>
-      )
+      badge: () => getOpenIssueCount(),
+      render: () => <ProductsPage />
     },
     {
       id: 'customers',
