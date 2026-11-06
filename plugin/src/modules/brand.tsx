@@ -1,15 +1,18 @@
 import { ensureRunningCampaignPolling, getRunningCampaignCount } from '../api/campaign-count'
 import { ensureInReviewPolling, getInReviewCount } from '../api/content-count'
 import { ensureDesignNeedsActionPolling, getDesignNeedsActionCount } from '../api/design-count'
+import { ensureVideoNeedsActionPolling, getVideoNeedsActionCount } from '../api/video-count'
 import { AssetsPage } from '../pages/assets/AssetsPage'
 import { CampaignsPage } from '../pages/campaigns/CampaignsPage'
 import { ContentsPage } from '../pages/contents/ContentsPage'
 import { DesignPage } from '../pages/design/DesignPage'
+import { VideoPage } from '../pages/video/VideoPage'
 import type { WorkbenchDef } from '../types'
 
 ensureRunningCampaignPolling()
 ensureInReviewPolling()
 ensureDesignNeedsActionPolling()
+ensureVideoNeedsActionPolling()
 
 export const brandWorkbench: WorkbenchDef = {
   id: 'brand',
@@ -36,6 +39,13 @@ export const brandWorkbench: WorkbenchDef = {
       codicon: 'symbol-color',
       badge: () => getDesignNeedsActionCount(),
       render: () => <DesignPage />
+    },
+    {
+      id: 'video',
+      label: '视频',
+      codicon: 'device-camera-video',
+      badge: () => getVideoNeedsActionCount(),
+      render: () => <VideoPage />
     },
     {
       id: 'assets',

@@ -171,6 +171,17 @@ function PreviewApp() {
           >
             设计页
           </Button>
+          <Button
+            size="xs"
+            data-preview-nav=""
+            variant={location?.workbench === 'brand' && location.page === 'video' ? 'default' : 'outline'}
+            onClick={() => {
+              setEmptyMode(false)
+              openPage({ workbench: 'brand', page: 'video' })
+            }}
+          >
+            视频页
+          </Button>
 
           <Button
             size="xs"

@@ -3,6 +3,8 @@ import { Badge, Codicon, EmptyState, Tip, cn } from '@hermes/plugin-sdk'
 import { useRunningCampaignCount } from './api/campaign-count'
 import { useInReviewCount } from './api/content-count'
 import { useDesignNeedsActionCount } from './api/design-count'
+import { useVideoNeedsActionCount } from './api/video-count'
+import { WorkbenchSettings } from './pages/WorkbenchSettings'
 import { useOpenInquiryCount } from './api/inquiry-count'
 import { useNeedsActionCount } from './api/install-count'
 import { useOpenIssueCount } from './api/open-count'
@@ -294,6 +296,7 @@ export function WorkbenchPane() {
   useRunningCampaignCount()
   useInReviewCount()
   useDesignNeedsActionCount()
+  useVideoNeedsActionCount()
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>(() => loadExpandedMap())
 
   const isExpanded = (id: string): boolean => {
@@ -338,6 +341,12 @@ export function WorkbenchPane() {
           activePageId={location?.workbench === wb.id ? location.page : undefined}
         />
       ))}
+      <details className="mt-auto border-t border-(--ui-stroke-secondary) pt-2">
+        <summary className="cursor-pointer px-2 py-1 text-xs text-(--ui-text-secondary)">设置</summary>
+        <div className="px-2 py-2">
+          <WorkbenchSettings />
+        </div>
+      </details>
     </nav>
   )
 }

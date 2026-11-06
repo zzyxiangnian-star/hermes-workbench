@@ -56,6 +56,7 @@ export function ReviewView({ id, onBack }: { id: number; onBack: () => void }) {
   )
   const [narrow, setNarrow] = useState(false)
   const [sideWidth, setSideWidth] = useState(280)
+  const [commentWidth, setCommentWidth] = useState(260)
   const [actor, setActor] = useState(loadActor)
   const [round, setRound] = useState<number | null>(null)
   const [selected, setSelected] = useState<number[]>([])
@@ -377,8 +378,8 @@ export function ReviewView({ id, onBack }: { id: number; onBack: () => void }) {
                   ))}
                 </div>
               ) : focused ? (
-                <div className={narrow ? 'flex flex-col gap-3' : 'flex min-w-0 items-start gap-3'}>
-                  <div className="min-w-0 flex-1">
+                <div className={narrow ? 'flex min-w-0 flex-col gap-3' : 'flex w-full max-w-max items-start'}>
+                  <div className="min-w-0">
                     <PinLayer
                       asset={focused}
                       comments={detail.comments}
@@ -407,38 +408,64 @@ export function ReviewView({ id, onBack }: { id: number; onBack: () => void }) {
                       </details>
                     ) : null}
                   </div>
-                  <aside className={narrow ? 'min-w-0' : 'w-52 shrink-0'}>
-                    <h3 className="mb-1 text-xs font-medium">这张图的批注</h3>
-                    {imageComments.length === 0 ? (
-                      <p className="text-xs text-(--ui-text-tertiary)">点大图可以写批注。</p>
-                    ) : (
-                      <ul className="flex flex-col gap-2">
-                        {imageComments.map(item => (
-                          <li key={item.id} className="rounded-md border border-(--ui-stroke-secondary) p-2 text-xs">
-                            <p>{item.body}</p>
-                            <p className="mt-1 text-(--ui-text-tertiary)">
-                              {item.author || '有人'}
-                              {item.resolved ? ' · 已解决' : ''}
-                            </p>
-                            {item.resolved ? null : (
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                className="mt-1"
-                                onClick={() =>
-                                  void resolveDesignComment(item.id, true).then(() => {
-                                    reload()
-                                    void refreshDesignNeedsActionCount()
-                                  })
-                                }
-                              >
-                                标已解决
-                              </Button>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
+                  <aside
+                    style={narrow ? undefined : { width: commentWidth }}
+                    className="relative flex min-w-0 shrink-0 flex-col border-l border-(--ui-stroke-secondary)"
+                  >
+                    {narrow ? null : (
+                      <div
+                        role="separator"
+                        aria-orientation="vertical"
+                        aria-label="调整批注栏宽度"
+                        className="absolute inset-y-0 left-0 z-10 w-1 cursor-col-resize select-none hover:bg-(--ui-accent)"
+                        onPointerDown={event => {
+                          const startX = event.clientX
+                          const startWidth = commentWidth
+                          const move = (ev: PointerEvent) => {
+                            setCommentWidth(Math.min(480, Math.max(220, startWidth - (ev.clientX - startX))))
+                          }
+                          const up = () => {
+                            window.removeEventListener('pointermove', move)
+                            window.removeEventListener('pointerup', up)
+                          }
+                          window.addEventListener('pointermove', move)
+                          window.addEventListener('pointerup', up)
+                        }}
+                      />
                     )}
+                    <div className="max-h-[70vh] overflow-y-auto px-3">
+                      <h3 className="mb-1 text-xs font-medium">这张图的批注</h3>
+                      {imageComments.length === 0 ? (
+                        <p className="text-xs text-(--ui-text-tertiary)">点大图可以写批注。</p>
+                      ) : (
+                        <ul className="flex flex-col gap-2">
+                          {imageComments.map(item => (
+                            <li key={item.id} className="rounded-md border border-(--ui-stroke-secondary) p-2 text-xs">
+                              <p className="break-words whitespace-pre-wrap">{item.body}</p>
+                              <p className="mt-1 text-(--ui-text-tertiary)">
+                                {item.author || '有人'}
+                                {item.resolved ? ' · 已解决' : ''}
+                              </p>
+                              {item.resolved ? null : (
+                                <Button
+                                  size="xs"
+                                  variant="outline"
+                                  className="mt-1"
+                                  onClick={() =>
+                                    void resolveDesignComment(item.id, true).then(() => {
+                                      reload()
+                                      void refreshDesignNeedsActionCount()
+                                    })
+                                  }
+                                >
+                                  标已解决
+                                </Button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
                   </aside>
                 </div>
               ) : (
