@@ -1,6 +1,6 @@
 [project]
 name = "hermes-workbench-server"
-version = "0.7.0"
+version = "0.9.0"
 description = "Hermes 工作台商品导入与规则检查"
 requires-python = ">=3.11"
 dependencies = [

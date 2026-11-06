@@ -1,6 +1,6 @@
 # WK08 在 grokbot 的电脑上做试用前的最终总测
 
-> W09 交回并审查后再发。沿用 WK07 的环境：`/workspace/hermes-k01/`、`HERMES_HOME=/workspace/hermes-k01/hermes-test`，不碰 `~/.hermes`。测前在 .env 里加 key，测完删掉、用 key 值 grep 一遍；启动服务时剥离 KEY/TOKEN/SECRET 和 `__CURSOR_SANDBOX_ENV_RESTORE`。
+> W09 已审查通过；等 W09.1（分镜页右栏）交回后再发。沿用 WK07 的环境：`/workspace/hermes-k01/`、`HERMES_HOME=/workspace/hermes-k01/hermes-test`，不碰 `~/.hermes`。测前在 .env 里加 key，测完删掉、用 key 值 grep 一遍；启动服务时剥离 KEY/TOKEN/SECRET 和 `__CURSOR_SANDBOX_ENV_RESTORE`。
 
 ## 背景
 九页界面全部做完。这次**按客户的方式安装**：用交付包，不用仓库目录，看说明书走不走得通；再把 WK07 没测的设计页、视频页、备份面板测完。
