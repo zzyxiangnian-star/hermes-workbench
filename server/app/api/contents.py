@@ -44,6 +44,8 @@ from app.models import (
 
 router = APIRouter()
 
+PLATFORM_LABELS = {"wechat": "公众号", "xiaohongshu": "小红书", "douyin": "抖音", "weibo": "微博", "tmall": "天猫", "jd": "京东", "pdd": "拼多多", "other": "其他平台"}
+
 EDITABLE = {"draft", "rejected"}
 
 
@@ -225,7 +227,7 @@ def publish(content_id: int, payload: PublishAction, session: Session = Depends(
     if content.status != "published":
         content.status = "published"
         content.published_at = utcnow()
-    label = f"已发布到 {payload.platform}" if payload.platform else "已发布"
+    label = f"已发布到{PLATFORM_LABELS.get(payload.platform, payload.platform)}" if payload.platform else "已发布"
     _log(content, payload.by, label, payload.url)
     return content_detail(session, content)
 
