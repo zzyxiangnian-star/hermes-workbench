@@ -157,8 +157,8 @@ export function InstallsPage() {
               )}
             </span>
             <span className="inline-flex items-center gap-1.5">
-              已完工
-              {summaryQuery.loading && !summary ? <Skeleton className="h-4 w-6" /> : <Badge variant="outline">{summary?.done ?? 0}</Badge>}
+              今日完工
+              {summaryQuery.loading && !summary ? <Skeleton className="h-4 w-6" /> : <Badge variant="outline">{summary?.done_today ?? 0}</Badge>}
             </span>
             {listQuery.loading && listQuery.data ? <Loader /> : null}
           </div>

@@ -1,12 +1,15 @@
 import { Codicon, EmptyState } from '@hermes/plugin-sdk'
+import { ensureOpenInquiryPolling, getOpenInquiryCount } from '../api/inquiry-count'
 import { ensureNeedsActionPolling, getNeedsActionCount } from '../api/install-count'
 import { ensureOpenIssuePolling, getOpenIssueCount } from '../api/open-count'
+import { CustomersPage } from '../pages/customers/CustomersPage'
 import { InstallsPage } from '../pages/installs/InstallsPage'
 import { ProductsPage } from '../pages/products/ProductsPage'
 import type { WorkbenchDef } from '../types'
 
 ensureOpenIssuePolling()
 ensureNeedsActionPolling()
+ensureOpenInquiryPolling()
 
 export const ecommerceWorkbench: WorkbenchDef = {
   id: 'ecommerce',
@@ -38,16 +41,8 @@ export const ecommerceWorkbench: WorkbenchDef = {
       id: 'customers',
       label: '客户',
       codicon: 'organization',
-      badge: () => 12,
-      render: () => (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState
-            icon={<Codicon name="organization" size="1.25rem" />}
-            title="客户"
-            description="汇总加购未买、询盘未成交和待回访客户，由 AI 先拟好跟进草稿，人工确认后再发送。"
-          />
-        </div>
-      )
+      badge: () => getOpenInquiryCount(),
+      render: () => <CustomersPage />
     },
     {
       id: 'install',

@@ -108,6 +108,17 @@ function PreviewApp() {
           <Button
             size="xs"
             data-preview-nav=""
+            variant={location?.workbench === 'ecommerce' && location.page === 'customers' ? 'default' : 'outline'}
+            onClick={() => {
+              setEmptyMode(false)
+              openPage({ workbench: 'ecommerce', page: 'customers' })
+            }}
+          >
+            客户页
+          </Button>
+          <Button
+            size="xs"
+            data-preview-nav=""
             variant={location?.workbench === 'ecommerce' && location.page === 'install' ? 'default' : 'outline'}
             onClick={() => {
               setEmptyMode(false)

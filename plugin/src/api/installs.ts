@@ -46,6 +46,7 @@ export interface InstallSummary {
   pending: number
   booked: number
   done: number
+  done_today: number
   exception: number
   cancelled: number
   overdue: number

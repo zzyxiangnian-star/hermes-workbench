@@ -3,6 +3,7 @@ import {
   type HTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
+  type Ref,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
   createContext,
@@ -529,9 +530,14 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   )
 }
 
-export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+export function Textarea({
+  className,
+  ref,
+  ...props
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> }) {
   return (
     <textarea
+      ref={ref}
       className={cn(
         'min-h-16 w-full rounded-md border border-(--ui-stroke-secondary) bg-(--ui-bg-editor) px-2 py-1.5 text-xs text-(--ui-text-primary) outline-none focus-visible:outline-2 focus-visible:outline-(--ui-accent)',
         className
@@ -752,6 +758,107 @@ export function ConfirmDialog({
       </div>
     </div>,
     document.body
+  )
+}
+
+/** 预览里没有 Hermes 的 Streamdown。报价单用同一套标签，样式写在页面上。 */
+export function Streamdown({
+  children,
+  className
+}: {
+  children?: ReactNode
+  className?: string
+  mode?: string
+  controls?: boolean
+  parseIncompleteMarkdown?: boolean
+}) {
+  const text = typeof children === 'string' ? children : ''
+  return <div className={cn('aui-md', className)}>{renderQuoteMarkdown(text)}</div>
+}
+
+function renderQuoteMarkdown(source: string): ReactNode[] {
+  const lines = source.replace(/\r\n/g, '\n').split('\n')
+  const blocks: ReactNode[] = []
+  let index = 0
+  let key = 0
+  while (index < lines.length) {
+    const line = lines[index] ?? ''
+    if (line.startsWith('|') && (lines[index + 1] ?? '').includes('---')) {
+      const rows: string[][] = []
+      while (index < lines.length && (lines[index] ?? '').startsWith('|')) {
+        const row = lines[index] ?? ''
+        if (!/^\|\s*-+/.test(row)) {
+          rows.push(row.split('|').slice(1, -1).map(cell => cell.trim()))
+        }
+        index += 1
+      }
+      const [head, ...body] = rows
+      blocks.push(
+        <table key={key}>
+          <thead>
+            <tr>
+              {(head ?? []).map((cell, cellIndex) => (
+                <th key={cellIndex}>{inlineMarkdown(cell)}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {body.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((cell, cellIndex) => (
+                  <td key={cellIndex}>{inlineMarkdown(cell)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )
+      key += 1
+      continue
+    }
+    if (line.startsWith('# ')) {
+      blocks.push(<h1 key={key}>{inlineMarkdown(line.slice(2))}</h1>)
+      key += 1
+      index += 1
+      continue
+    }
+    if (line.startsWith('## ')) {
+      blocks.push(<h2 key={key}>{inlineMarkdown(line.slice(3))}</h2>)
+      key += 1
+      index += 1
+      continue
+    }
+    if (line.startsWith('- ')) {
+      const items: string[] = []
+      while (index < lines.length && (lines[index] ?? '').startsWith('- ')) {
+        items.push((lines[index] ?? '').slice(2))
+        index += 1
+      }
+      blocks.push(
+        <ul key={key}>
+          {items.map((item, itemIndex) => (
+            <li key={itemIndex}>{inlineMarkdown(item)}</li>
+          ))}
+        </ul>
+      )
+      key += 1
+      continue
+    }
+    if (!line.trim()) {
+      index += 1
+      continue
+    }
+    blocks.push(<p key={key}>{inlineMarkdown(line)}</p>)
+    key += 1
+    index += 1
+  }
+  return blocks
+}
+
+function inlineMarkdown(text: string): ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g)
+  return parts.map((part, index) =>
+    part.startsWith('**') && part.endsWith('**') ? <strong key={index}>{part.slice(2, -2)}</strong> : part
   )
 }
 
