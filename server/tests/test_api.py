@@ -4,7 +4,7 @@ from helpers import create_shop, issues, rule_by_kind, table, upload
 def test_health_rules_and_cors(client):
     health = client.get("/api/health")
     assert health.status_code == 200
-    assert health.json() == {"status": "ok"}
+    assert health.json()["status"] == "ok" and health.json()["version"]
     allowed = client.get("/api/health", headers={"Origin": "http://127.0.0.1:5173"})
     assert allowed.headers["access-control-allow-origin"] == "http://127.0.0.1:5173"
     localhost = client.get("/api/health", headers={"Origin": "http://localhost:4173"})
