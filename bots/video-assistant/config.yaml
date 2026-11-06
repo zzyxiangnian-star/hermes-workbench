@@ -13,6 +13,7 @@ mcp_servers:
         - wb_create_video_project
         - wb_add_shot_media
         - wb_search_library
+        - wb_view_images
         - wb_get_product_card
         - wb_get_brand_guide
         - wb_check_compliance

@@ -46,6 +46,7 @@
 | `wb_create_video_project` | `title`、`brand`、`shots[{duration, visual, voiceover, subtitle}]`、`product_code`、`campaign_id`、`platform`、`aspect`、`brief` | `{id, status:"draft", shot_count, duration}` | `POST /api/video-projects` |
 | `wb_add_shot_media` | `project_id`、`seq`、`slot`（voice / visual）、`file` 或 `asset_id`、`prompt` | `{project_status, duration, shot}` | `POST /api/video-projects/{id}/shots/{seq}/media` |
 | `wb_search_library` | `brand`、`product_code`、`kind`、`q`、`limit` | `{total, items: 素材[]}`（只有信息，没有文件内容） | `GET /api/assets` |
+| `wb_view_images` | `asset_ids`（1–4 个） | 每张图一行说明加一张图片（MCP image 内容块，单张不超过 8 MB）；Hermes 会把图存进缓存并直接给模型看 | 读素材文件 |
 
 C10 的 5 个给视频助手用，字段见 [CONTRACT-video.md](CONTRACT-video.md)。`wb_create_video_project` 作者固定为“视频助手”、状态固定为写脚本；`wb_add_shot_media` 只能改写脚本中的项目，`file` 的规矩同 `wb_add_design_candidate`（配音一般是 `text_to_speech` 返回的本机路径），`asset_id` 只能选素材库里的图或视频当画面。
 

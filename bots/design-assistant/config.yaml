@@ -10,6 +10,7 @@ mcp_servers:
       include:
         - wb_list_design_requests
         - wb_get_design_request
+        - wb_view_images
         - wb_add_design_candidate
         - wb_get_product_card
         - wb_get_brand_guide

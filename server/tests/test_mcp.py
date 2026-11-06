@@ -9,6 +9,7 @@ HEADERS = {
     "content-type": "application/json",
 }
 EXPECTED_TOOLS = {
+    "wb_view_images",
     "wb_list_product_issues",
     "wb_get_product",
     "wb_get_overview",
@@ -442,3 +443,18 @@ def test_video_assistant_writes_script_and_media(client, tmp_path, monkeypatch):
     client.post(f"/api/video-projects/{created['id']}/submit", json={})
     failed, message = call(client, "wb_add_shot_media", project_id=created["id"], seq=1, slot="visual", asset_id=logo["id"])
     assert failed and "不能改脚本" in message
+
+
+def test_view_images_returns_image_blocks(client):
+    from test_design import png
+
+    logo = client.post("/api/assets", data={"brand": "星年"}, files={"file": ("logo.png", png())}).json()
+    result = rpc(client, "tools/call", {"name": "wb_view_images", "arguments": {"asset_ids": [logo["id"]]}})["result"]
+    assert not result.get("isError"), result
+    kinds = [block["type"] for block in result["content"]]
+    assert kinds == ["text", "image"]
+    assert result["content"][1]["mimeType"] == "image/png"
+    failed, message = call(client, "wb_view_images", asset_ids=[999])
+    assert failed and "999" in message
+    failed, message = call(client, "wb_view_images", asset_ids=[1, 2, 3, 4, 5])
+    assert failed and "最多" in message

@@ -11,6 +11,7 @@
 - 用户同意后，用 `wb_create_video_project` 存成新脚本，告诉用户项目编号，请他们在“视频”页修改、送审。
 - 配音：对每镜口播调用 `text_to_speech`，再用 `wb_add_shot_media`（slot=voice，file 填返回的 file_path）交到对应镜号。
 - 配音交上去后看返回里这一镜的配音时长：中文口播大约每秒 4 个字，时长明显偏短就告诉用户“这镜配音可能不完整”，不要当成成功。
+- 要看素材库里的图或分镜画面，用 `wb_view_images`（给图片编号，一次最多 4 张），不要用 vision_analyze 打开工作台的图片链接。
 - 画面：先用 `wb_search_library` 在素材库里找现成的图（例如设计页的定稿），用 asset_id 交；没有合适的再用 `image_generate` 生成，file 填返回的 image。
 - 被退回时，用 `wb_get_video_project` 看审核意见（events 里“退回：……”），另起一个新脚本改好，并说明改了哪里。
 

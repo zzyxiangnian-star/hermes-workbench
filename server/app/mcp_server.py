@@ -17,11 +17,13 @@ from mcp.server.transport_security import TransportSecuritySettings
 
 try:  # mcp 1.x
     from mcp.server.fastmcp import FastMCP as _MCPServer
+    from mcp.server.fastmcp import Image as McpImage
     from mcp.server.fastmcp.exceptions import ToolError
 
     MCP_V1 = True
 except ImportError:  # mcp 2.x 把 FastMCP 改名为 MCPServer，HTTP 设置挪到 streamable_http_app()
     from mcp.server.mcpserver import MCPServer as _MCPServer
+    from mcp.server.mcpserver import Image as McpImage
     from mcp.server.mcpserver.exceptions import ToolError
 
     MCP_V1 = False
@@ -41,7 +43,7 @@ from app.api.customers import list_customers, list_inquiries, segment_summary
 from app.customers import add_inquiry_note, mask_text
 from app.api.design import _request as _design_request
 from app.api.design import asset_out, get_request as get_design_request, list_requests as list_design_requests
-from app.design import add_candidate, load_ai_file, load_ai_image, store_file
+from app.design import add_candidate, file_path as asset_file, load_ai_file, load_ai_image, store_file
 from app.api.design import list_assets
 from app.api.video import _project as _video_project
 from app.installs import _event as _video_event
@@ -98,6 +100,9 @@ def http_routes(mcp: Any) -> list:
         app = mcp.streamable_http_app(**_HTTP, transport_security=_security())
     return list(app.routes)
 
+
+MAX_VIEW_IMAGES = 4
+MAX_VIEW_BYTES = 8 * 1024 * 1024
 
 WRITE_TOOLS = frozenset(
     {
@@ -586,6 +591,38 @@ def build_mcp(session_factory: sessionmaker) -> Any:
             return {"total": len(items), "items": items[:size]}
 
         return run(query)
+
+    @mcp.tool(
+        description=(
+            f"看工作台里的图：参考图、候选稿、定稿、分镜画面、素材库里的图。asset_ids 一次最多 {MAX_VIEW_IMAGES} 个，"
+            "图片编号从 wb_get_design_request、wb_get_video_project、wb_search_library 的结果里取。"
+            "工作台地址是本机地址，不要用 vision_analyze 去打开图片链接，用这个工具。"
+        ),
+        structured_output=False,
+    )
+    def wb_view_images(asset_ids: list[int]) -> list[Any]:
+        ids = list(dict.fromkeys(asset_ids))
+        if not ids:
+            raise ToolFailure("至少给一个图片编号")
+        if len(ids) > MAX_VIEW_IMAGES:
+            raise ToolFailure(f"一次最多看 {MAX_VIEW_IMAGES} 张图")
+        result: list[Any] = []
+        try:
+            with session_scope() as session:
+                for asset_id in ids:
+                    asset = session.get(Asset, asset_id)
+                    if asset is None:
+                        raise ToolFailure(f"没有编号 {asset_id} 的图")
+                    if not asset.mime.startswith("image/"):
+                        raise ToolFailure(f"#{asset_id} 不是图片（{asset.mime}）")
+                    if asset.size > MAX_VIEW_BYTES:
+                        raise ToolFailure(f"#{asset_id} 太大（{asset.size // 1024 // 1024} MB），超过 {MAX_VIEW_BYTES // 1024 // 1024} MB")
+                    size = f"{asset.width}x{asset.height}" if asset.width and asset.height else "尺寸未知"
+                    result.append(f"#{asset.id} {asset.file_name}（{asset.role}，{size}）")
+                    result.append(McpImage(data=asset_file(asset).read_bytes(), format=asset.mime.split("/", 1)[1]))
+        except AppError as exc:
+            raise ToolFailure(exc.message) from exc
+        return result
 
     @mcp.tool(
         description=(
