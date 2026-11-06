@@ -15,7 +15,8 @@
    3. 断网（或拔网线）再双击一次：仍能启动。
    4. 双击 `start.bat`（同样注意端口），确认建的是 `server\data\workbench.db`，第一次启动日志里能看到迁移到 `c10` 再出现 Uvicorn 启动行。
    5. 把 `env.example.bat` 复制成 `env.bat`，填一个 `WB_IMPORT_DIR`（路径带中文），重启后 `GET /api/import/folder` 显示启用。
-4. 确认 zip 里没有 `env.bat`、`.db`、`.venv`、`tests\`。
+4. 在 `env.bat` 里设 `WB_BACKUP_DIR`（路径带中文），后端开着时双击 `scripts\backup.bat`：应生成 `数据库\workbench-日期-时间.db` 和 `素材\`；再双击一次，素材显示新复制 0 个。用 DB Browser 或 `python -c "import sqlite3;print(sqlite3.connect(r'快照路径').execute('select count(*) from shops').fetchone())"` 确认快照能打开。
+5. 确认 zip 里没有 `env.bat`、`.db`、`.venv`、`tests\`。
 
 ## 交回
 `docs\reports\C12-report.md`：每一步的结果和报错原文、zip 文件列表的前 20 行、版本.txt。脚本有问题就直接改 `server\scripts\*.bat` 或 `tools\package.py` 并在报告里写清楚改了什么，提交信息以 `C12:` 开头。

@@ -12,3 +12,8 @@ rem set WB_ASSET_DIR=D:\工作台素材
 rem set WB_ASSET_MAX_MB=50
 rem 设计助手交图时允许读取的 Hermes 生图目录（默认 %USERPROFILE%\.hermes），多个用分号隔开
 rem set WB_AI_IMAGE_DIRS=
+rem 备份：每天 12:30 自动备份数据库和素材（off 关掉），只留最近 14 份数据库快照
+rem 建议放到另一块硬盘或网盘同步文件夹
+rem set WB_BACKUP_DIR=E:\工作台备份
+rem set WB_BACKUP_AT=12:30
+rem set WB_BACKUP_KEEP=14

@@ -1,4 +1,4 @@
-"""进程内的定时任务：早报，以及报表文件夹定时导入。WB_SCHEDULER=off 时都不启动。"""
+"""进程内的定时任务：早报、报表文件夹定时导入、每天备份。WB_SCHEDULER=off 时都不启动。"""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import sessionmaker
 
 from app.ad_rules import run_ad_rules
+from app.backup import run_backup
 from app.folder_import import import_dir, scan
 from app.overview import SHANGHAI
 from app.reports import build_daily_report, deliver, webhook_targets
@@ -17,7 +18,7 @@ from app.rules import run_enabled_rules
 logger = logging.getLogger("workbench")
 
 
-def start_scheduler(session_factory: sessionmaker):
+def start_scheduler(session_factory: sessionmaker, database_url: str | None = None):
     if os.environ.get("WB_SCHEDULER", "on").strip().lower() == "off":
         return None
     from apscheduler.schedulers.background import BackgroundScheduler
@@ -46,8 +47,28 @@ def start_scheduler(session_factory: sessionmaker):
             max_instances=1,
             coalesce=True,
         )
+    backup_at = os.environ.get("WB_BACKUP_AT", "12:30").strip()
+    if backup_at.lower() != "off":
+        b_hour, b_minute = _daily_at(backup_at)
+        scheduler.add_job(
+            run_backup_job,
+            CronTrigger(hour=b_hour, minute=b_minute, timezone=SHANGHAI),
+            id="backup",
+            replace_existing=True,
+            kwargs={"database_url": database_url},
+            max_instances=1,
+            coalesce=True,
+        )
     scheduler.start()
     return scheduler
+
+
+def run_backup_job(database_url: str | None = None) -> None:
+    try:
+        result = run_backup(database_url)
+        logger.info("backup: %s, %s asset files copied", result["database"], result["assets_copied"])
+    except Exception:
+        logger.exception("backup failed")
 
 
 def run_folder_job(session_factory: sessionmaker) -> None:
@@ -89,11 +110,11 @@ def _daily_at(value: str) -> tuple[int, int]:
     text = (value or "08:30").strip()
     parts = text.split(":")
     if len(parts) != 2:
-        raise RuntimeError("WB_DAILY_AT 必须是 HH:MM")
+        raise RuntimeError("WB_DAILY_AT、WB_BACKUP_AT 必须是 HH:MM（备份也可以写 off）")
     try:
         hour, minute = int(parts[0]), int(parts[1])
     except ValueError as exc:
-        raise RuntimeError("WB_DAILY_AT 必须是 HH:MM") from exc
+        raise RuntimeError("WB_DAILY_AT、WB_BACKUP_AT 必须是 HH:MM（备份也可以写 off）") from exc
     if hour not in range(24) or minute not in range(60):
-        raise RuntimeError("WB_DAILY_AT 必须是 HH:MM")
+        raise RuntimeError("WB_DAILY_AT、WB_BACKUP_AT 必须是 HH:MM（备份也可以写 off）")
     return hour, minute

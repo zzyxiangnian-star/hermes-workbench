@@ -109,7 +109,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     init_db(app.state.engine, app.state.database_url)
-    scheduler = start_scheduler(app.state.session_factory)
+    scheduler = start_scheduler(app.state.session_factory, database_url=app.state.database_url)
     app.state.scheduler = scheduler
     try:
         async with app.state.mcp.session_manager.run():
