@@ -1,3 +1,4 @@
+from app.mcp_server import WRITE_TOOLS
 import json
 
 from helpers import SAMPLES, create_shop, issues, table, upload, upload_to
@@ -91,8 +92,10 @@ def test_tool_list_is_read_only_plus_note(client):
         assert tool["description"], tool["name"]
         assert any("一" <= ch <= "鿿" for ch in tool["description"]), tool["name"]
     forbidden = ("status", "rule", "import", "send", "price", "delete", "update", "patch", "set")
-    for name in names - {"wb_add_note", "wb_create_draft", "wb_add_install_note", "wb_add_inquiry_note", "wb_add_design_candidate", "wb_create_video_project", "wb_add_shot_media"}:
+    for name in names - WRITE_TOOLS:
         assert not any(word in name for word in forbidden), name
+    for tool in tools:
+        assert tool["annotations"]["readOnlyHint"] is (tool["name"] not in WRITE_TOOLS), tool["name"]
     note_params = set(next(t for t in tools if t["name"] == "wb_add_note")["inputSchema"]["properties"])
     assert note_params == {"issue_id", "note"}
 
@@ -429,6 +432,7 @@ def test_video_assistant_writes_script_and_media(client, tmp_path, monkeypatch):
     assert not failed and found["items"][0]["id"] == logo["id"]
     failed, pictured = call(client, "wb_add_shot_media", project_id=created["id"], seq=2, slot="visual", asset_id=logo["id"])
     assert not failed and pictured["shot"]["media"]["id"] == logo["id"]
+    assert any("素材库" in e["text"] for e in client.get(f"/api/video-projects/{created['id']}").json()["events"])
 
     failed, message = call(client, "wb_add_shot_media", project_id=created["id"], seq=2, slot="voice", file=str(hermes / "cache" / "audio" / "tts_1.wav"), asset_id=1)
     assert failed and "只能给一个" in message

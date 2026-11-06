@@ -25,6 +25,7 @@ except ImportError:  # mcp 2.x 把 FastMCP 改名为 MCPServer，HTTP 设置挪�
     from mcp.server.mcpserver.exceptions import ToolError
 
     MCP_V1 = False
+from mcp.types import ToolAnnotations
 from pydantic import ValidationError
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload, sessionmaker
@@ -43,6 +44,7 @@ from app.api.design import asset_out, get_request as get_design_request, list_re
 from app.design import add_candidate, load_ai_file, load_ai_image, store_file
 from app.api.design import list_assets
 from app.api.video import _project as _video_project
+from app.installs import _event as _video_event
 from app.api.video import attach_media, create_project as create_video_project, get_project as get_video_project
 from app.api.video import list_projects as list_video_projects
 from app.design_schemas import VideoProjectIn
@@ -54,7 +56,7 @@ from app.api.issues import _issue_out, list_issues
 from app.api.reports import _report_out
 from app.errors import AppError
 from app.brand import campaign_review, check_text
-from app.models import Asset, Issue, Product, ProductCard
+from app.models import Asset, Issue, Product, ProductCard, utcnow
 from app.overview import build_overview, build_trend, overview_payload
 from app.reports import build_daily_report, report_day
 
@@ -97,11 +99,37 @@ def http_routes(mcp: Any) -> list:
     return list(app.routes)
 
 
+WRITE_TOOLS = frozenset(
+    {
+        "wb_add_note",
+        "wb_create_draft",
+        "wb_add_install_note",
+        "wb_add_inquiry_note",
+        "wb_add_design_candidate",
+        "wb_create_video_project",
+        "wb_add_shot_media",
+    }
+)
+
+
 def build_mcp(session_factory: sessionmaker) -> Any:
     if MCP_V1:
         mcp = _MCPServer(name="hermes-workbench", instructions=INSTRUCTIONS, **_HTTP, transport_security=_security())
     else:
         mcp = _MCPServer(name="hermes-workbench", instructions=INSTRUCTIONS)
+
+    # 给每个工具标上只读 / 写入注解。Hermes 据此判断后端断开时能不能自动重试只读工具。
+    register = mcp.tool
+
+    def tool(**kwargs: Any) -> Any:
+        def decorate(fn: Any) -> Any:
+            write = fn.__name__ in WRITE_TOOLS
+            hints = ToolAnnotations(readOnlyHint=not write, destructiveHint=False, idempotentHint=not write, openWorldHint=False)
+            return register(annotations=hints, **kwargs)(fn)
+
+        return decorate
+
+    mcp.tool = tool
 
     @contextmanager
     def session_scope() -> Iterator[Session]:
@@ -697,6 +725,8 @@ def build_mcp(session_factory: sessionmaker) -> Any:
                 if shot is None:
                     raise ToolFailure(f"没有第 {seq} 镜")
                 shot.media_asset_id = asset.id
+                project.events = [*project.events, _video_event(AI_VIDEO, f"第 {seq} 镜画面（素材库 #{asset.id}）")]
+                project.updated_at = utcnow()
                 session.flush()
                 session.refresh(shot)
             else:

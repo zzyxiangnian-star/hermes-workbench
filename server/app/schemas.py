@@ -145,6 +145,7 @@ class RuleRunOut(BaseModel):
     opened: int
     updated: int
     resolved: int
+    reopened: int = 0
     open_remaining: int
 
 

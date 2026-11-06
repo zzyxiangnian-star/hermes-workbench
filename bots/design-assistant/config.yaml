@@ -22,3 +22,16 @@ agent:
     - browser
     - code_execution
     - file
+    - delegation      # 不能让子代理去跑命令或装软件（WK05 出现过）
+    - desktop_ui      # 含 read_terminal（WK02 调用过）
+    - computer_use
+    - cronjob
+
+# 不让 Bot 在后台自己建或改技能（WK02/WK05 各自动建了一个）。要加技能由人从技能市场装。
+auxiliary:
+  background_review:
+    enabled: false
+curator:
+  enabled: false
+skills:
+  write_approval: true

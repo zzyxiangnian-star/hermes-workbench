@@ -73,7 +73,7 @@ def normalize_params(kind: str, params: dict[str, Any] | None) -> dict[str, Any]
 
 def run_enabled_rules(session: Session) -> dict[str, int]:
     rules = session.scalars(select(Rule).where(Rule.enabled.is_(True)).order_by(Rule.id)).all()
-    opened = updated = resolved = 0
+    opened = updated = resolved = reopened = 0
     for rule in rules:
         params = normalize_params(rule.kind, rule.params)
         violations = evaluate(session, rule.kind, params)
@@ -99,6 +99,22 @@ def run_enabled_rules(session: Session) -> dict[str, int]:
                         updated += 1
                 continue
             if existing:
+                continue
+            # 以前处理过（人工点了已处理，或上次导入后自动消掉）但这次又出现：重开原来那条，不另开一条重复的。
+            earlier = session.scalars(
+                select(Issue)
+                .where(Issue.rule_id == rule.id, Issue.product_id == product_id, Issue.status == "resolved")
+                .order_by(Issue.id.desc())
+                .limit(1)
+            ).first()
+            if earlier is not None:
+                earlier.status = "open"
+                earlier.resolved_at = None
+                earlier.level = rule.level
+                earlier.message = message
+                reopened_note = "导入后检查仍不满足，已重新打开"
+                earlier.note = f"{earlier.note}\n{reopened_note}" if earlier.note else reopened_note
+                reopened += 1
                 continue
             session.add(
                 Issue(
@@ -126,6 +142,7 @@ def run_enabled_rules(session: Session) -> dict[str, int]:
         "opened": opened,
         "updated": updated,
         "resolved": resolved,
+        "reopened": reopened,
         "open_remaining": int(open_remaining),
     }
 

@@ -160,3 +160,15 @@ def test_zero_price_gap_is_reported(client):
     assert len(found) == 2
     assert "最低售价为 0" in found[0]["message"]
     assert "甲店" in found[0]["message"] and "乙店" in found[0]["message"]
+
+
+def test_manually_resolved_issue_reopens_instead_of_duplicating(client):
+    shop = create_shop(client)
+    upload(client, shop["id"], "floor.csv", table(("LOW", "F1", "低于底价", 189, 199, 20, "日常")))
+    [issue] = issues(client, status="open")
+    assert client.patch(f"/api/issues/{issue['id']}", json={"status": "resolved"}).status_code == 200
+    again = upload(client, shop["id"], "floor.csv", table(("LOW", "F1", "低于底价", 189, 199, 20, "日常")))
+    assert again.json()["rules"]["opened"] == 0 and again.json()["rules"]["reopened"] == 1
+    [reopened] = issues(client, status="open")
+    assert reopened["id"] == issue["id"] and "重新打开" in reopened["note"]
+    assert issues(client, status="resolved") == []
