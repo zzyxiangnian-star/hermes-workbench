@@ -199,6 +199,37 @@ export function runRules(): Promise<RulesRunResult> {
   return apiFetch<RulesRunResult>('/api/rules/run', { method: 'POST' })
 }
 
+export interface FolderImportStatus {
+  enabled: boolean
+  path: string | null
+  exists: boolean
+}
+
+export interface FolderScanFile {
+  shop: string
+  file: string
+  kind: string | null
+  ok: boolean
+  rows_ok: number
+  rows_failed: number
+  reason: string | null
+}
+
+export interface FolderScanResult {
+  path: string
+  imported: number
+  failed: number
+  files: FolderScanFile[]
+}
+
+export function getFolderImport(): Promise<FolderImportStatus> {
+  return apiFetch<FolderImportStatus>('/api/import/folder')
+}
+
+export function scanFolderImport(): Promise<FolderScanResult> {
+  return apiFetch<FolderScanResult>('/api/import/folder/scan', { method: 'POST', timeoutMs: 60_000 })
+}
+
 export function importProducts(shopId: number, file: File): Promise<ImportResult> {
   const body = new FormData()
   body.set('shop_id', String(shopId))

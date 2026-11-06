@@ -17,7 +17,11 @@ import {
 import { ApiError } from '../../api/client'
 import {
   createShop,
+  getFolderImport,
   importProducts,
+  scanFolderImport,
+  type FolderImportStatus,
+  type FolderScanResult,
   type ImportResult,
   type Shop
 } from '../../api/products'
@@ -114,6 +118,8 @@ export function ImportDialog({
           <DialogTitle>导入报表</DialogTitle>
           <DialogDescription>选择店铺和 xlsx / csv 文件。导入完成后会自动按规则检查。</DialogDescription>
         </DialogHeader>
+
+        <FolderImportRow open={open} />
 
         {result ? (
           <div className="flex flex-col gap-3 text-xs">
@@ -241,5 +247,98 @@ export function ImportDialog({
         )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+const FOLDER_KIND: Record<string, string> = {
+  products: '商品',
+  metrics: '经营',
+  ad_spend: '投放',
+  orders: '订单'
+}
+
+function FolderImportRow({ open }: { open: boolean }) {
+  const [status, setStatus] = useState<FolderImportStatus | null>(null)
+  const [scan, setScan] = useState<FolderScanResult | null>(null)
+  const [statusError, setStatusError] = useState<string | null>(null)
+  const [scanError, setScanError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    setScan(null)
+    setScanError(null)
+    setStatusError(null)
+    getFolderImport().then(
+      value => {
+        if (!cancelled) setStatus(value)
+      },
+      (reason: unknown) => {
+        if (!cancelled) setStatusError(reason instanceof Error ? reason.message : '读不到报表文件夹')
+      }
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [open])
+
+  const runScan = async () => {
+    setBusy(true)
+    setScanError(null)
+    try {
+      setScan(await scanFolderImport())
+    } catch (reason) {
+      setScan(null)
+      setScanError(reason instanceof Error ? reason.message : '导入失败')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-(--ui-stroke-secondary) px-2 py-2 text-xs">
+      {statusError ? <p className="text-destructive">{statusError}</p> : null}
+      {!status && !statusError ? <p className="text-(--ui-text-tertiary)">正在查看报表文件夹…</p> : null}
+      {status && !status.enabled ? (
+        <p className="text-(--ui-text-secondary)">
+          还没启用自动导入。把 server\scripts\env.example.bat 复制成 env.bat，填上 WB_IMPORT_DIR（每个店铺一个同名子文件夹），保存后重启后端。
+        </p>
+      ) : null}
+      {status?.enabled ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-(--ui-text-secondary)">
+            报表文件夹：{status.path}
+            {status.exists ? '' : '（这个路径现在不存在）'}
+            ，每 10 分钟自动导入
+          </p>
+          <Button size="xs" variant="outline" disabled={busy} onClick={() => void runScan()}>
+            {busy ? '正在导入' : '立即导入'}
+          </Button>
+        </div>
+      ) : null}
+      {scanError ? <p className="text-destructive">{scanError}</p> : null}
+      {scan ? (
+        <div className="flex flex-col gap-1">
+          <p className="text-(--ui-text-primary)">
+            成功 {scan.imported} 个文件，失败 {scan.failed} 个
+          </p>
+          <ul className="max-h-32 overflow-y-auto border border-(--ui-stroke-secondary)">
+            {scan.files.length === 0 ? (
+              <li className="px-2 py-1.5 text-(--ui-text-tertiary)">文件夹里没有待导入的表。</li>
+            ) : null}
+            {scan.files.map(file => (
+              <li key={`${file.shop}-${file.file}`} className="border-b border-(--ui-stroke-secondary) px-2 py-1.5">
+                {file.shop} / {file.file}
+                {file.kind ? `（${FOLDER_KIND[file.kind] ?? file.kind}）` : ''}：
+                {file.ok
+                  ? `成功 ${file.rows_ok} 行${file.rows_failed ? `，${file.rows_failed} 行没导进去` : ''}`
+                  : `失败，${file.reason ?? '未知原因'}`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   )
 }

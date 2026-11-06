@@ -96,6 +96,7 @@ function PreviewApp() {
           <span className="mr-1 font-medium text-(--ui-text-secondary)">预览控制：</span>
           <Button
             size="xs"
+            data-preview-nav=""
             variant={location?.page === 'products' ? 'default' : 'outline'}
             onClick={() => {
               setEmptyMode(false)
@@ -106,6 +107,7 @@ function PreviewApp() {
           </Button>
           <Button
             size="xs"
+            data-preview-nav=""
             variant={location?.workbench === 'brand' && location.page === 'campaigns' ? 'default' : 'outline'}
             onClick={() => {
               setEmptyMode(false)
@@ -116,6 +118,7 @@ function PreviewApp() {
           </Button>
           <Button
             size="xs"
+            data-preview-nav=""
             variant={location?.workbench === 'brand' && location.page === 'assets' ? 'default' : 'outline'}
             onClick={() => {
               setEmptyMode(false)
@@ -123,6 +126,17 @@ function PreviewApp() {
             }}
           >
             资料页
+          </Button>
+          <Button
+            size="xs"
+            data-preview-nav=""
+            variant={location?.workbench === 'brand' && location.page === 'content' ? 'default' : 'outline'}
+            onClick={() => {
+              setEmptyMode(false)
+              openPage({ workbench: 'brand', page: 'content' })
+            }}
+          >
+            内容页
           </Button>
 
           <Button

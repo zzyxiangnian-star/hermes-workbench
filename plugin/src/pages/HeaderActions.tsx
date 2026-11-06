@@ -8,10 +8,11 @@ export function HeaderActions({ children }: { children: ReactNode }) {
     const slot = document.querySelector('[data-slot="actions"]')
     if (!node || !(slot instanceof HTMLElement)) return
     const parent = node.parentNode
-    const next = node.nextSibling
     slot.appendChild(node)
     return () => {
-      if (parent?.isConnected) parent.insertBefore(node, next)
+      // 旁边的兄弟节点会在后续渲染里被换掉，按当初的 next 插回去会抛 NotFoundError，整页被卸掉。
+      if (parent?.isConnected) parent.appendChild(node)
+      else node.remove()
     }
   }, [])
   return (

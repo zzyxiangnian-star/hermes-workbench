@@ -1,10 +1,13 @@
 import { Codicon, EmptyState } from '@hermes/plugin-sdk'
 import { ensureRunningCampaignPolling, getRunningCampaignCount } from '../api/campaign-count'
+import { ensureInReviewPolling, getInReviewCount } from '../api/content-count'
 import { AssetsPage } from '../pages/assets/AssetsPage'
 import { CampaignsPage } from '../pages/campaigns/CampaignsPage'
+import { ContentsPage } from '../pages/contents/ContentsPage'
 import type { WorkbenchDef } from '../types'
 
 ensureRunningCampaignPolling()
+ensureInReviewPolling()
 
 export const brandWorkbench: WorkbenchDef = {
   id: 'brand',
@@ -22,15 +25,8 @@ export const brandWorkbench: WorkbenchDef = {
       id: 'content',
       label: '内容',
       codicon: 'edit',
-      render: () => (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState
-            icon={<Codicon name="edit" size="1.25rem" />}
-            title="内容"
-            description="按产品资料起草推文与脚本，自动检查禁用词并适配公众号、小红书、抖音格式。"
-          />
-        </div>
-      )
+      badge: () => getInReviewCount(),
+      render: () => <ContentsPage />
     },
     {
       id: 'design',
