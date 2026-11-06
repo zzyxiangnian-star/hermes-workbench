@@ -12,6 +12,7 @@
 2. 后端用演示数据新起一份：`workbench-demo --db /workspace/wk07.db`，`WB_ASSET_DIR=/workspace/wk07-assets`，`WB_AI_IMAGE_DIRS=/workspace/hermes-k01/hermes-test`，端口 8000。
 3. 打包安装插件同 WK03 第 2 步，记录 plugin.js 大小和 SHA256。
 4. **插件七页**，逐项记“通过 / 不通过 + 现象”，每页浅色截一张：
+   0. **先测这条**：后端新加了来源检查，Origin 为 null 的请求只放行 User-Agent 里带 `Electron/` 的（Hermes 桌面版）。打开工作台任一分页，数据能正常出来就算通过；如果全部显示连不上、后端日志里是 403，记下开发者工具 Network 里那条请求的 Origin 和 User-Agent 原文，然后在启动后端时加 `WB_NULL_ORIGIN=any` 继续测其余项。另外用 `curl -H 'Origin: null' 127.0.0.1:8000/api/health` 应得到 403，`curl -H 'Host: evil.example' 127.0.0.1:8000/api/health` 也应是 403。
    1. 左栏徽标：商品、客户（未关闭询盘数）、安装（待预约加异常）、活动、内容的数字和对应接口一致（`/api/issues/summary`、`/api/customers/segments` 或询盘列表、`/api/installs/summary`、活动和内容列表）。
    2. 经营、商品：沿用 WK03 第 4 项，只看有没有回退。
    3. 活动：日历视图、新建活动、抽屉里任务勾选。
