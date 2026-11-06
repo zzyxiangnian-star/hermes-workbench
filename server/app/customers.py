@@ -8,6 +8,8 @@
 
 from __future__ import annotations
 
+import os
+
 import csv
 import io
 import re
@@ -18,17 +20,30 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app import csv_safe
 from app.brand import check_text, today
 from app.errors import AppError
 from app.installs import CLOSED_WORDS, _event, local_text
 from app.models import Customer, Followup, FollowupTarget, Inquiry, Order, Quote, Shop, utcnow
 from app.overview import SHANGHAI
 
-NEW_DAYS = 30
-DORMANT_DAYS = 90
-INQUIRY_STALE_DAYS = 7
+
+
+def _days(name: str, default: int) -> int:
+    """分层天数可以在 env.bat 里改（重启后端生效），客户确认前先用默认值。"""
+    raw = os.environ.get(name, "").strip()
+    if not raw:
+        return default
+    if not raw.isdigit() or not 1 <= int(raw) <= 3650:
+        raise RuntimeError(f"{name} 必须是 1 到 3650 之间的天数")
+    return int(raw)
+
+
+NEW_DAYS = _days("WB_NEW_CUSTOMER_DAYS", 30)
+DORMANT_DAYS = _days("WB_DORMANT_DAYS", 90)
+INQUIRY_STALE_DAYS = _days("WB_INQUIRY_STALE_DAYS", 7)
 MAX_TARGETS = 1000
-QUOTE_VALID_DAYS = 15
+QUOTE_VALID_DAYS = _days("WB_QUOTE_VALID_DAYS", 15)
 
 SEGMENTS = {
     "new": "新客",
@@ -127,7 +142,7 @@ def customer_stats(session: Session, customer_ids: list[int] | None = None) -> d
 
 
 def open_inquiry_customers(session: Session, now: datetime | None = None) -> set[int]:
-    """有询盘还没成交、而且超过 7 天没动静的客户。"""
+    """有询盘还没成交、而且超过 INQUIRY_STALE_DAYS 天（默认 7）没动静的客户。"""
     cutoff = (now or utcnow()) - timedelta(days=INQUIRY_STALE_DAYS)
     rows = session.execute(
         select(Inquiry.customer_id, Inquiry.updated_at).where(
@@ -352,7 +367,7 @@ TARGET_LABELS = {"pending": "待发", "sent": "已发", "skipped": "跳过"}
 def export_targets(followup: Followup) -> bytes:
     """给人工发送用的名单（含完整手机号，只在本机生成，不经过 AI）。"""
     buffer = io.StringIO()
-    writer = csv.writer(buffer)
+    writer = csv_safe.writer(buffer)
     writer.writerow(EXPORT_HEADER)
     for n, target in enumerate(followup.targets, 1):
         customer = target.customer

@@ -17,3 +17,8 @@ rem 建议放到另一块硬盘或网盘同步文件夹
 rem set WB_BACKUP_DIR=E:\工作台备份
 rem set WB_BACKUP_AT=12:30
 rem set WB_BACKUP_KEEP=14
+rem 客户分层天数（客户确认后再改，改完重启后端）：新客、沉睡、询盘未跟进；报价单默认有效天数
+rem set WB_NEW_CUSTOMER_DAYS=30
+rem set WB_DORMANT_DAYS=90
+rem set WB_INQUIRY_STALE_DAYS=7
+rem set WB_QUOTE_VALID_DAYS=15

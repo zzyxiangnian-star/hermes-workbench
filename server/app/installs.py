@@ -17,6 +17,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import csv_safe
 from app.errors import AppError
 from app.importer import (
     _cell,
@@ -358,7 +359,7 @@ EXPORT_HEADER = ["工单号", "店铺", "订单号", "付款时间", "商品", "
 def export_csv(installs: list[InstallOrder]) -> bytes:
     """交给啄木鸟（或其他服务商）的预约表。含完整手机号和地址，只在本机生成，不经过 AI。"""
     buffer = io.StringIO()
-    writer = csv.writer(buffer)
+    writer = csv_safe.writer(buffer)
     writer.writerow(EXPORT_HEADER)
     for item in installs:
         order = item.order

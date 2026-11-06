@@ -4,6 +4,12 @@ from fastapi.testclient import TestClient
 from app.main import create_app
 
 
+@pytest.fixture(autouse=True)
+def _test_host(monkeypatch):
+    # TestClient 默认 Host 是 testserver。
+    monkeypatch.setenv("WB_ALLOWED_HOSTS", "testserver")
+
+
 @pytest.fixture()
 def client(tmp_path, monkeypatch):
     monkeypatch.setenv("WB_SCHEDULER", "off")

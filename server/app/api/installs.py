@@ -19,6 +19,7 @@ from app.brand_schemas import (
 from app.db import get_db
 from app.errors import AppError
 from app.importer import parse_mapping
+from app.importer import read_report
 from app.installs import (
     STATUS_LABELS,
     add_note,
@@ -45,7 +46,7 @@ async def upload_orders(
     file: UploadFile = File(...),
     session: Session = Depends(get_db),
 ) -> dict:
-    content = await file.read()
+    content = await read_report(file)
     run, stats = import_orders(
         session, shop_id=shop_id, file_name=file.filename or "upload", content=content, mapping=parse_mapping(mapping)
     )

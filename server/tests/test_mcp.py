@@ -104,7 +104,7 @@ def test_tool_list_is_read_only_plus_note(client):
 def test_rejects_foreign_host(client):
     body = {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
     response = client.post("/mcp", content=json.dumps(body), headers={**HEADERS, "host": "evil.example.com"})
-    assert response.status_code == 421
+    assert response.status_code == 403  # 外层的本机检查先拦下（MCP 自己的检查会回 421）
 
 
 def test_list_product_issues_defaults_to_open_and_limits(client):

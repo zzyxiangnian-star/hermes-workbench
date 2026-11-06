@@ -76,6 +76,17 @@ _VALIDATION_MESSAGES = {
 }
 
 
+def _host_name(header: str) -> str:
+    """Host 头去掉端口；IPv6 写作 [::1]:8000。"""
+    if header.startswith("["):
+        return header.split("]", 1)[0] + "]"
+    return header.rsplit(":", 1)[0]
+
+
+def _split_env(name: str) -> list[str]:
+    return [item.strip() for item in os.environ.get(name, "").split(",") if item.strip()]
+
+
 def create_app(database_url: str | None = None) -> FastAPI:
     url = database_url or default_database_url()
     engine = make_engine(url)
@@ -84,7 +95,7 @@ def create_app(database_url: str | None = None) -> FastAPI:
     app.state.database_url = url
     app.state.session_factory = make_session_factory(engine)
     app.state.scheduler = None
-    extra = [item.strip() for item in os.environ.get("WB_ALLOWED_ORIGINS", "").split(",") if item.strip()]
+    extra = _split_env("WB_ALLOWED_ORIGINS")
     app.add_middleware(
         CORSMiddleware,
         # Hermes 桌面版从 file:// 打开，Origin 是字符串 null。
@@ -94,6 +105,21 @@ def create_app(database_url: str | None = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    # 下面两道检查加在 CORS 外层（后加的在外面），预检请求也要先过这里。
+    hosts = {"127.0.0.1", "localhost", "[::1]", *_split_env("WB_ALLOWED_HOSTS")}
+
+    @app.middleware("http")
+    async def local_only(request: Request, call_next):
+        # 防 DNS 重绑定：别的网站把自己的域名解析到 127.0.0.1 后，浏览器会带着它的域名当 Host。
+        host = _host_name(request.headers.get("host", ""))
+        if host not in hosts:
+            return JSONResponse({"error": {"code": "host_not_allowed", "message": "工作台只接受本机地址的请求"}}, status_code=403)
+        # Origin 为 null 的请求只放行 Hermes 桌面版（Electron）。普通浏览器里，任何网站都能用沙箱 iframe 发出 Origin: null。
+        if request.headers.get("origin") == "null" and os.environ.get("WB_NULL_ORIGIN", "electron").strip().lower() != "any":
+            if "Electron/" not in request.headers.get("user-agent", ""):
+                return JSONResponse({"error": {"code": "origin_not_allowed", "message": "只接受 Hermes 桌面版的请求"}}, status_code=403)
+        return await call_next(request)
+
     app.include_router(api_router)
     # 电商助手的 MCP 工具，Streamable HTTP，地址 /mcp。
     mcp = build_mcp(app.state.session_factory)

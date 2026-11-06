@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.folder_import import import_dir, scan
-from app.importer import import_ad_spend, import_metrics, import_products, parse_mapping
+from app.importer import import_ad_spend, import_metrics, import_products, parse_mapping, read_report
 from app.models import ImportRun
 from app.schemas import ImportRunOut, RuleRunOut
 
@@ -18,7 +18,7 @@ async def upload_products(
     file: UploadFile = File(...),
     session: Session = Depends(get_db),
 ) -> ImportRunOut:
-    content = await file.read()
+    content = await read_report(file)
     run, stats = import_products(
         session,
         shop_id=shop_id,
@@ -36,7 +36,7 @@ async def upload_metrics(
     file: UploadFile = File(...),
     session: Session = Depends(get_db),
 ) -> ImportRunOut:
-    content = await file.read()
+    content = await read_report(file)
     run = import_metrics(
         session,
         shop_id=shop_id,
@@ -54,7 +54,7 @@ async def upload_ad_spend(
     file: UploadFile = File(...),
     session: Session = Depends(get_db),
 ) -> ImportRunOut:
-    content = await file.read()
+    content = await read_report(file)
     run, stats = import_ad_spend(
         session,
         shop_id=shop_id,

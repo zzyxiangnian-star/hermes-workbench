@@ -17,6 +17,7 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session, object_session
 
+from app import csv_safe
 from app.brand import check_text
 from app.design import AUDIO_MIMES, IMAGE_MIMES, file_path
 from app.errors import AppError
@@ -328,7 +329,7 @@ def package(project: VideoProject) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
         table = io.StringIO()
-        writer = csv.writer(table)
+        writer = csv_safe.writer(table)
         writer.writerow(["镜号", "开始(秒)", "结束(秒)", "时长(秒)", "画面", "口播", "字幕", "画面文件", "配音文件"])
         for shot, item in zip(project.shots, line["shots"]):
             names = {}

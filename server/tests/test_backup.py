@@ -37,3 +37,12 @@ def test_backup_rejects_non_sqlite():
 
     with pytest.raises(AppError):
         run_backup("postgresql://x/y")
+
+
+def test_csv_cells_cannot_become_formulas():
+    from app.csv_safe import safe_cell
+
+    assert safe_cell("=HYPERLINK(\"http://x\")") == "'=HYPERLINK(\"http://x\")"
+    assert safe_cell("@SUM(A1)") == "'@SUM(A1)"
+    assert safe_cell("-12.5") == "-12.5" and safe_cell(-3) == -3
+    assert safe_cell("张先生") == "张先生"

@@ -10,8 +10,18 @@ def test_health_rules_and_cors(client):
     localhost = client.get("/api/health", headers={"Origin": "http://localhost:4173"})
     assert localhost.headers["access-control-allow-origin"] == "http://localhost:4173"
     # Hermes 桌面版从 file:// 打开，浏览器把 Origin 标成 null。
-    null_origin = client.get("/api/health", headers={"Origin": "null"})
+    electron = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Electron/44.9.3 Safari/537.36"
+    null_origin = client.get("/api/health", headers={"Origin": "null", "User-Agent": electron})
     assert null_origin.headers["access-control-allow-origin"] == "null"
+    # 普通浏览器里的沙箱 iframe 也会发 Origin: null，要拦下来（包括预检）
+    sandboxed = client.get("/api/health", headers={"Origin": "null", "User-Agent": "Mozilla/5.0 Chrome/140.0"})
+    assert sandboxed.status_code == 403 and sandboxed.json()["error"]["code"] == "origin_not_allowed"
+    preflight = client.options("/api/issues", headers={"Origin": "null", "Access-Control-Request-Method": "GET"})
+    assert preflight.status_code == 403
+    # DNS 重绑定：Host 不是本机
+    rebound = client.get("/api/health", headers={"Host": "evil.example:8000"})
+    assert rebound.status_code == 403 and rebound.json()["error"]["code"] == "host_not_allowed"
+    assert client.get("/api/health", headers={"Host": "127.0.0.1:8000"}).status_code == 200
     blocked = client.get("/api/health", headers={"Origin": "https://example.com"})
     assert "access-control-allow-origin" not in blocked.headers
 

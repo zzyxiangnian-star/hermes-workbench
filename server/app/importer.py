@@ -560,3 +560,16 @@ def _parse_whole(value: object, label: str) -> int:
     if number > 1_000_000_000:
         raise ValueError(f"{label}过大")
     return int(number)
+
+
+MAX_IMPORT_MB = 50
+
+
+async def read_report(file) -> bytes:
+    """读上传的报表，超过 50 MB 直接拒绝（平台导出的表一般几 MB）。"""
+    from app.errors import AppError
+
+    data = await file.read(MAX_IMPORT_MB * 1024 * 1024 + 1)
+    if len(data) > MAX_IMPORT_MB * 1024 * 1024:
+        raise AppError(413, "file_too_large", f"文件超过 {MAX_IMPORT_MB} MB，请按日期或店铺拆开再导入")
+    return data
