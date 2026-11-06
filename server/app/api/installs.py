@@ -27,6 +27,7 @@ from app.installs import (
     export_csv,
     import_orders,
     is_overdue,
+    done_on,
     money,
     order_code,
     sync_installs,
@@ -65,12 +66,19 @@ async def upload_orders(
 @router.get("/installs/summary", response_model=InstallSummary)
 def install_summary(shop_id: int | None = None, session: Session = Depends(get_db)) -> dict:
     counts = {key: 0 for key in STATUS_LABELS}
-    overdue = 0
+    overdue = done_today = 0
     now = utcnow()
+    today = now.astimezone(SHANGHAI).date()
     for item in session.scalars(_scoped(shop_id)):
         counts[item.status] += 1
         overdue += is_overdue(item, now)
-    return {**counts, "overdue": overdue, "needs_action": counts["pending"] + counts["exception"]}
+        done_today += done_on(item, today)
+    return {
+        **counts,
+        "overdue": overdue,
+        "done_today": done_today,
+        "needs_action": counts["pending"] + counts["exception"],
+    }
 
 
 @router.get("/installs", response_model=list[InstallOut])

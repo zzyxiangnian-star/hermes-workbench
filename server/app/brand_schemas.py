@@ -513,6 +513,7 @@ class InstallSummary(BaseModel):
     exception: int
     cancelled: int
     overdue: int
+    done_today: int = 0
     needs_action: int
 
 

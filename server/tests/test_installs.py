@@ -93,6 +93,12 @@ def test_status_flow_notes_notice_and_export(client):
     assert booked["events"][-1]["text"] == "待预约 → 已预约，预约 2026-11-06 14:00"
     assert booked["events"][-1]["by"] == "客服小周"
 
+    moved = client.post(f"/api/installs/{iid}/status", json={"status": "booked", "appointment_at": "2026-11-07T09:00:00+08:00"}).json()
+    assert moved["status"] == "booked" and moved["events"][-1]["text"] == "改预约：2026-11-06 14:00 → 2026-11-07 09:00"
+    assert client.post(f"/api/installs/{iid}/status", json={"status": "booked"}).status_code == 409
+    moved = client.post(f"/api/installs/{iid}/status", json={"status": "booked", "appointment_at": "2026-11-06T14:00:00+08:00"})
+    assert moved.status_code == 200
+
     text = client.get(f"/api/installs/{iid}/notice").json()["text"]
     assert text.startswith("张先生/女士，您购买的星年 变频空调 1.5 匹已为您预约安装：2026-11-06 14:00，师傅：刘师傅。")
 
@@ -104,6 +110,7 @@ def test_status_flow_notes_notice_and_export(client):
     client.post(f"/api/installs/{iid}/status", json={"status": "booked"})
     done = client.post(f"/api/installs/{iid}/status", json={"status": "done"}).json()
     assert done["status"] == "done"
+    assert client.get("/api/installs/summary").json()["done_today"] == 1
     stuck = client.post(f"/api/installs/{iid}/status", json={"status": "pending"})
     assert stuck.status_code == 409
 

@@ -51,7 +51,7 @@
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/installs?status=&shop_id=&q=&overdue=` | 按创建时间倒序；`q` 搜订单号、商品、收货人、手机 |
-| GET | `/installs/summary?shop_id=` | `{pending, booked, done, exception, cancelled, overdue, needs_action}`，徽标用 `needs_action`（待预约 + 异常） |
+| GET | `/installs/summary?shop_id=` | `{pending, booked, done, exception, cancelled, overdue, done_today, needs_action}`，徽标用 `needs_action`（待预约 + 异常）；`done` 是全部已完工，`done_today` 是北京时间今天标完工的 |
 | GET | `/installs/{id}` | 详情，多 `events`：`[{at, by, text}]` 处理记录 |
 | POST | `/installs/{id}/status` | `{status, by?, appointment_at?, engineer?, provider_ref?, reason?}` → 详情 |
 | POST | `/installs/{id}/notes` | `{note, by?}`，追加备注 → 详情 |
@@ -64,3 +64,5 @@
 ## 隐私
 
 工作台页面和导出表里是完整的姓名、手机、地址（本机使用）。经 MCP 给 AI 的一律打码：姓名只留姓、手机 `138****5678`、地址只留到区县。
+
+改预约（C07.1）：已预约的工单再 `POST /installs/{id}/status`，body `{status: "booked", appointment_at: ...}`，只改时间（可同时改 engineer、provider_ref），状态不变，记录写“改预约：旧时间 → 新时间”。不带 `appointment_at` 仍是 409。

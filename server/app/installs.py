@@ -259,6 +259,9 @@ def change_status(
 ) -> None:
     if status not in STATUS_LABELS:
         raise AppError(400, "invalid_status", "状态必须是 pending、booked、done、exception 或 cancelled")
+    if status == install.status == "booked" and appointment_at is not None:
+        reschedule(install, appointment_at, by=by, engineer=engineer, provider_ref=provider_ref)
+        return
     if status == install.status:
         raise AppError(409, "invalid_transition", f"工单已经是{STATUS_LABELS[status]}")
     if status not in TRANSITIONS[install.status]:
@@ -286,6 +289,38 @@ def change_status(
     install.status = status
     install.events = [*install.events, _event(by, text)]
     install.updated_at = utcnow()
+
+
+def reschedule(
+    install: InstallOrder,
+    appointment_at: datetime,
+    *,
+    by: str | None,
+    engineer: str | None = None,
+    provider_ref: str | None = None,
+) -> None:
+    """已预约的工单改预约时间，状态不变。"""
+    before = local_text(install.appointment_at)
+    install.appointment_at = to_utc(appointment_at)
+    if engineer is not None:
+        install.engineer = engineer
+    if provider_ref is not None:
+        install.provider_ref = provider_ref
+    install.events = [*install.events, _event(by, f"改预约：{before} → {local_text(install.appointment_at)}")]
+    install.updated_at = utcnow()
+
+
+def done_on(install: InstallOrder, day) -> bool:
+    """这张工单是不是在北京时间 day 这天标的已完工（看流转记录里最后一次改成已完工的时间）。"""
+    if install.status != "done":
+        return False
+    for event in reversed(install.events or []):
+        if event.get("text", "").endswith("→ 已完工") or "→ 已完工：" in event.get("text", ""):
+            at = datetime.fromisoformat(event["at"])
+            if at.tzinfo is None:
+                at = at.replace(tzinfo=timezone.utc)
+            return at.astimezone(SHANGHAI).date() == day
+    return False
 
 
 def add_note(install: InstallOrder, by: str | None, note: str) -> None:
