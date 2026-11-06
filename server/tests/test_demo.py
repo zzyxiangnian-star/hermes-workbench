@@ -3,6 +3,7 @@ from app.demo import build
 
 def test_demo_builds_a_lively_but_small_dataset(tmp_path, monkeypatch):
     monkeypatch.setenv("WB_SCHEDULER", "off")
+    monkeypatch.delenv("WB_ALLOWED_HOSTS", raising=False)  # 演示数据要在真实环境里也能生成
     db = tmp_path / "demo.db"
     db.write_text("旧文件会被覆盖")
     summary = build(db)

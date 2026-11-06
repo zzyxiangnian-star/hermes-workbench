@@ -77,7 +77,7 @@ def build(db_path: Path) -> dict:
 
     end = today() - timedelta(days=1)
     start = end - timedelta(days=DAYS - 1)
-    with TestClient(app) as client:
+    with TestClient(app, base_url="http://127.0.0.1") as client:
         api = _Api(client)
         shops = {name: api.post("/api/shops", {"platform": p, "name": name, "brand": b}) for p, name, b, _ in SHOPS}
         _products(api, shops, rng)
