@@ -1,5 +1,7 @@
 # WK07 在 grokbot 的电脑上实测品牌助手，并整体走一遍插件七页
 
+> **已并入 WK08，不用单独发。**
+
 > 在 Hermes 里打开 grokbot 的对话，把下面全文发给它。沿用 WK06 的环境：`/workspace/hermes-k01/`、`HERMES_HOME=/workspace/hermes-k01/hermes-test`，不碰 `~/.hermes`。测前在 .env 里加 key，测完删掉、用 key 值 grep 一遍；启动服务时剥离 KEY/TOKEN/SECRET 和 `__CURSOR_SANDBOX_ENV_RESTORE`。
 
 ## 背景
