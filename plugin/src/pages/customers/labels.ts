@@ -144,16 +144,20 @@ export async function copyText(text: string): Promise<boolean> {
     await navigator.clipboard.writeText(text)
     return true
   } catch {
+    const area = document.createElement('textarea')
+    area.value = text
+    area.setAttribute('readonly', '')
+    area.style.position = 'fixed'
+    area.style.left = '-9999px'
+    area.style.opacity = '0'
+    document.body.appendChild(area)
     try {
-      const area = document.createElement('textarea')
-      area.value = text
-      document.body.appendChild(area)
       area.select()
-      const ok = document.execCommand('copy')
-      area.remove()
-      return ok
+      return document.execCommand('copy')
     } catch {
       return false
+    } finally {
+      area.remove()
     }
   }
 }

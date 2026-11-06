@@ -160,6 +160,17 @@ function PreviewApp() {
           >
             内容页
           </Button>
+          <Button
+            size="xs"
+            data-preview-nav=""
+            variant={location?.workbench === 'brand' && location.page === 'design' ? 'default' : 'outline'}
+            onClick={() => {
+              setEmptyMode(false)
+              openPage({ workbench: 'brand', page: 'design' })
+            }}
+          >
+            设计页
+          </Button>
 
           <Button
             size="xs"

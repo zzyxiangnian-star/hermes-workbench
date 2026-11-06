@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Badge, Codicon, EmptyState, Tip, cn } from '@hermes/plugin-sdk'
 import { useRunningCampaignCount } from './api/campaign-count'
 import { useInReviewCount } from './api/content-count'
+import { useDesignNeedsActionCount } from './api/design-count'
 import { useOpenInquiryCount } from './api/inquiry-count'
 import { useNeedsActionCount } from './api/install-count'
 import { useOpenIssueCount } from './api/open-count'
@@ -292,6 +293,7 @@ export function WorkbenchPane() {
   useOpenInquiryCount()
   useRunningCampaignCount()
   useInReviewCount()
+  useDesignNeedsActionCount()
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>(() => loadExpandedMap())
 
   const isExpanded = (id: string): boolean => {
