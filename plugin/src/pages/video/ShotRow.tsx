@@ -91,8 +91,9 @@ export function ShotRow({
           )}
         </button>
       </td>
-      <td className="min-w-36 px-1 py-1.5">
+      <td className="min-w-0 px-1 py-1.5">
         <Textarea
+          className="min-w-0"
           aria-label={`第 ${seq} 镜画面说明`}
           rows={2}
           value={shot.visual}
@@ -100,8 +101,9 @@ export function ShotRow({
           onChange={event => onChange({ visual: event.target.value })}
         />
       </td>
-      <td className="min-w-36 px-1 py-1.5">
+      <td className="min-w-0 px-1 py-1.5">
         <Textarea
+          className="min-w-0"
           aria-label={`第 ${seq} 镜口播`}
           rows={2}
           value={shot.voiceover}
@@ -112,8 +114,9 @@ export function ShotRow({
           <p className="mt-0.5 text-[0.6875rem] text-(--ui-text-tertiary)">约 {formatSeconds(estimate)}</p>
         ) : null}
       </td>
-      <td className="min-w-32 px-1 py-1.5">
+      <td className="min-w-0 px-1 py-1.5">
         <Textarea
+          className="min-w-0"
           aria-label={`第 ${seq} 镜字幕`}
           rows={2}
           value={shot.subtitle ?? ''}
@@ -142,7 +145,7 @@ export function ShotRow({
           </div>
         )}
       </td>
-      <td className="w-24 px-1 py-1.5">
+      <td className="min-w-0 px-1 py-1.5">
         <Input
           aria-label={`第 ${seq} 镜时长`}
           type="number"
@@ -160,7 +163,7 @@ export function ShotRow({
         {stretched ? <p className="text-[0.6875rem] text-(--ui-text-secondary)">按配音拉长</p> : null}
       </td>
       <td className="px-1 py-1.5">
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <Button
             size="xs"
             variant="outline"
@@ -207,8 +210,9 @@ export function ShotRow({
           }}
         />
       </td>
-      <td className="min-w-28 px-1 py-1.5">
+      <td className="min-w-0 px-1 py-1.5">
         <Textarea
+          className="min-w-0"
           aria-label={`第 ${seq} 镜备注`}
           rows={2}
           value={shot.note}

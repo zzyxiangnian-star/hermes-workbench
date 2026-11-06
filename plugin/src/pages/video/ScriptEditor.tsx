@@ -45,7 +45,7 @@ export function ScriptEditor({ id, onBack }: { id: number; onBack: () => void })
   const [drafts, setDrafts] = useState<ShotDraft[]>([])
   const [saved, setSaved] = useState('')
   const [narrow, setNarrow] = useState(false)
-  const [railWidth, setRailWidth] = useState(280)
+  const [railWidth, setRailWidth] = useState(260)
   const [actor, setActor] = useState(loadActor)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -79,7 +79,7 @@ export function ScriptEditor({ id, onBack }: { id: number; onBack: () => void })
     const el = root.current
     if (!el) return
     const observer = new ResizeObserver(entries => {
-      setNarrow((entries[0]?.contentRect.width ?? 0) < 720)
+      setNarrow((entries[0]?.contentRect.width ?? 0) < 900)
     })
     observer.observe(el)
     return () => observer.disconnect()
@@ -198,15 +198,15 @@ export function ScriptEditor({ id, onBack }: { id: number; onBack: () => void })
   const open = project.status === 'draft' || project.status === 'in_review' || project.status === 'approved'
 
   return (
-    <div ref={root} className="flex min-w-0 flex-1 flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
+    <div ref={root} className="flex w-full min-w-0 max-w-full flex-1 flex-col gap-3 overflow-x-hidden">
+      <div className="flex w-full min-w-0 flex-wrap items-center gap-2">
         <Button size="sm" variant="ghost" onClick={requestBack}>
           返回
         </Button>
         <h2 className="min-w-0 truncate text-sm font-medium">{project.title}</h2>
         <Badge variant={statusVariant(project.status)}>{statusLabel(project.status)}</Badge>
         <span className="text-xs text-(--ui-text-tertiary)">总长 {formatSeconds(project.duration)}</span>
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+        <div className="ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
           <Button size="sm" variant="outline" disabled={project.shots.length === 0} onClick={() => setPreviewing(value => !value)}>
             {previewing ? '分镜' : '预览'}
           </Button>
@@ -256,10 +256,21 @@ export function ScriptEditor({ id, onBack }: { id: number; onBack: () => void })
       {previewing ? (
         <Preview projectId={id} dirty={dirty} onBack={() => setPreviewing(false)} />
       ) : (
-        <div className={narrow ? 'flex min-w-0 flex-col gap-4' : 'flex min-w-0 items-start'}>
+        <div className={narrow ? 'flex w-full min-w-0 flex-col gap-4' : 'flex w-full min-w-0 items-start'}>
           <div className="flex min-w-0 flex-1 flex-col gap-2">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-xs">
+            <div className="w-full min-w-0 overflow-x-auto">
+              <table className="w-full min-w-[42rem] table-fixed border-collapse text-xs">
+                <colgroup>
+                  <col className="w-10" />
+                  <col className="w-14" />
+                  <col />
+                  <col />
+                  <col />
+                  <col className="w-[4.5rem]" />
+                  <col className="w-28" />
+                  <col />
+                  <col className="w-14" />
+                </colgroup>
                 <thead>
                   <tr className="border-b border-(--ui-stroke-secondary) text-left text-(--ui-text-tertiary)">
                     <th className="px-1 py-1 font-medium">镜号</th>
@@ -344,7 +355,10 @@ export function ScriptEditor({ id, onBack }: { id: number; onBack: () => void })
               }}
             />
           )}
-          <aside style={narrow ? undefined : { width: railWidth }} className="flex shrink-0 flex-col gap-3">
+          <aside
+            style={narrow ? undefined : { width: railWidth }}
+            className="flex w-full min-w-0 shrink-0 flex-col gap-3 break-words"
+          >
             <section className="flex flex-col gap-1">
               <h3 className="text-xs font-medium">审核记录</h3>
               {project.events.length === 0 ? (
