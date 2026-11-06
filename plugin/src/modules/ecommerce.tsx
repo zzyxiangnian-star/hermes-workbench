@@ -1,9 +1,12 @@
 import { Codicon, EmptyState } from '@hermes/plugin-sdk'
+import { ensureNeedsActionPolling, getNeedsActionCount } from '../api/install-count'
 import { ensureOpenIssuePolling, getOpenIssueCount } from '../api/open-count'
+import { InstallsPage } from '../pages/installs/InstallsPage'
 import { ProductsPage } from '../pages/products/ProductsPage'
 import type { WorkbenchDef } from '../types'
 
 ensureOpenIssuePolling()
+ensureNeedsActionPolling()
 
 export const ecommerceWorkbench: WorkbenchDef = {
   id: 'ecommerce',
@@ -50,15 +53,8 @@ export const ecommerceWorkbench: WorkbenchDef = {
       id: 'install',
       label: '安装',
       codicon: 'tools',
-      render: () => (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState
-            icon={<Codicon name="tools" size="1.25rem" />}
-            title="安装"
-            description="跟踪需要上门安装的订单进度、预约时间、服务商派单与完工回访结果。"
-          />
-        </div>
-      )
+      badge: () => getNeedsActionCount(),
+      render: () => <InstallsPage />
     }
   ]
 }

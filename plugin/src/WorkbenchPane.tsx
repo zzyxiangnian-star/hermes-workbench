@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Badge, Codicon, EmptyState, Tip, cn } from '@hermes/plugin-sdk'
 import { useRunningCampaignCount } from './api/campaign-count'
 import { useInReviewCount } from './api/content-count'
+import { useNeedsActionCount } from './api/install-count'
 import { useOpenIssueCount } from './api/open-count'
 import { openPage, useLocation, useWorkbenches } from './registry'
 import type { WorkbenchDef, WorkbenchPageDef } from './types'
@@ -286,6 +287,7 @@ export function WorkbenchPane() {
   const workbenches = useWorkbenches()
   const location = useLocation()
   useOpenIssueCount()
+  useNeedsActionCount()
   useRunningCampaignCount()
   useInReviewCount()
   const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>(() => loadExpandedMap())

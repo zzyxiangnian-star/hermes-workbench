@@ -66,6 +66,20 @@ export function IssueDrawer({
     return rules.find(rule => rule.id === issue.rule_id)?.name ?? issue.rule_kind
   }
 
+  const reopen = async (issue: Issue) => {
+    setPendingId(issue.id)
+    setActionError(null)
+    try {
+      await patchIssue(issue.id, { status: 'open', note: notes[issue.id] ?? '' })
+      onChanged()
+      setRevision(value => value + 1)
+    } catch (reason) {
+      setActionError(reason instanceof Error ? reason.message : '操作失败')
+    } finally {
+      setPendingId(null)
+    }
+  }
+
   const markResolved = async (issue: Issue) => {
     setPendingId(issue.id)
     setActionError(null)
@@ -171,6 +185,16 @@ export function IssueDrawer({
                   >
                     忽略
                   </Button>
+                  {issue.status !== 'open' ? (
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      disabled={pendingId === issue.id}
+                      onClick={() => void reopen(issue)}
+                    >
+                      重新打开
+                    </Button>
+                  ) : null}
                 </div>
               </li>
             ))}

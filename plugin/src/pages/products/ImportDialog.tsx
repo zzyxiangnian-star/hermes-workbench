@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  SegmentedControl,
   Select,
   SelectContent,
   SelectItem,
@@ -15,6 +16,7 @@ import {
   SelectValue
 } from '@hermes/plugin-sdk'
 import { ApiError } from '../../api/client'
+import { importOrders } from '../../api/installs'
 import {
   createShop,
   getFolderImport,
@@ -32,14 +34,17 @@ const PLATFORMS = ['tmall', 'jd', 'pdd', 'douyin'] as const
 export function ImportDialog({
   open,
   shops,
+  initialKind = 'products',
   onClose,
   onDone
 }: {
   open: boolean
   shops: Shop[]
+  initialKind?: 'products' | 'orders'
   onClose: () => void
   onDone: () => void
 }) {
+  const [kind, setKind] = useState<'products' | 'orders'>(initialKind)
   const [shopId, setShopId] = useState<string>('')
   const [createdShops, setCreatedShops] = useState<Shop[]>([])
   const [creating, setCreating] = useState(false)
@@ -53,6 +58,7 @@ export function ImportDialog({
 
   useEffect(() => {
     if (!open) return
+    setKind(initialKind)
     setError(null)
     setResult(null)
     setFile(null)
@@ -96,7 +102,7 @@ export function ImportDialog({
     setBusy(true)
     setError(null)
     try {
-      const imported = await importProducts(Number(shopId), file)
+      const imported = kind === 'orders' ? await importOrders(Number(shopId), file) : await importProducts(Number(shopId), file)
       setResult(imported)
       onDone()
     } catch (reason) {
@@ -115,8 +121,12 @@ export function ImportDialog({
     <Dialog open={open} onOpenChange={next => { if (!next) onClose() }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>导入报表</DialogTitle>
-          <DialogDescription>选择店铺和 xlsx / csv 文件。导入完成后会自动按规则检查。</DialogDescription>
+          <DialogTitle>{kind === 'orders' ? '导入订单' : '导入报表'}</DialogTitle>
+          <DialogDescription>
+            {kind === 'orders'
+              ? '选择店铺和订单表。买了需安装商品的订单会生成工单。'
+              : '选择店铺和 xlsx / csv 文件。导入完成后会自动按规则检查。'}
+          </DialogDescription>
         </DialogHeader>
 
         <FolderImportRow open={open} />
@@ -125,6 +135,7 @@ export function ImportDialog({
           <div className="flex flex-col gap-3 text-xs">
             <p className="text-sm text-(--ui-text-primary)">
               成功 {result.rows_ok} 行，失败 {result.rows_failed} 行
+              {result.installs ? `，新建工单 ${result.installs.created} 张` : ''}
             </p>
             {result.errors.length > 0 ? (
               <ul className="max-h-48 overflow-y-auto border border-(--ui-stroke-secondary) text-(--ui-text-secondary)">
@@ -142,12 +153,21 @@ export function ImportDialog({
                   onClose()
                 }}
               >
-                查看商品
+                {kind === 'orders' ? '完成' : '查看商品'}
               </Button>
             </DialogFooter>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
+            <SegmentedControl
+              options={[
+                { id: 'products', label: '商品' },
+                { id: 'orders', label: '订单' }
+              ]}
+              value={kind}
+              sizing="content"
+              onChange={value => setKind(value)}
+            />
             {knownShops.length > 0 && !creating ? (
               <label className="flex flex-col gap-1 text-xs text-(--ui-text-secondary)">
                 店铺

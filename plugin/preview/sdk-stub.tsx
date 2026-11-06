@@ -437,11 +437,13 @@ export function Switch({
   checked = false,
   onCheckedChange,
   disabled,
+  size: _size,
   ...props
 }: {
   checked?: boolean
   onCheckedChange?: (checked: boolean) => void
   disabled?: boolean
+  size?: 'default' | 'xs'
 } & ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
@@ -462,6 +464,38 @@ export function Switch({
           checked ? 'left-4' : 'left-0.5'
         )}
       />
+    </button>
+  )
+}
+
+export function Checkbox({
+  checked = false,
+  onCheckedChange,
+  disabled,
+  ...props
+}: {
+  checked?: boolean | 'indeterminate'
+  onCheckedChange?: (checked: boolean) => void
+  disabled?: boolean
+} & ButtonHTMLAttributes<HTMLButtonElement>) {
+  const on = checked === true
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={checked === 'indeterminate' ? 'mixed' : on}
+      disabled={disabled}
+      onClick={event => {
+        event.stopPropagation()
+        onCheckedChange?.(!on)
+      }}
+      className={cn(
+        'inline-flex size-4 shrink-0 items-center justify-center rounded-sm border border-(--ui-stroke-secondary)',
+        on ? 'bg-(--ui-accent) text-(--ui-bg-editor)' : 'bg-(--ui-bg-editor)'
+      )}
+      {...props}
+    >
+      {on ? '✓' : ''}
     </button>
   )
 }

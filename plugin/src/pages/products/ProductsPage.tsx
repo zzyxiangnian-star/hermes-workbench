@@ -192,7 +192,8 @@ export function ProductsPage() {
           ) : null}
 
           {!loading && pageData && pageData.items.length > 0 ? (
-            <div className="min-h-0 flex-1">
+            <div className="min-h-0 min-w-0 flex-1 overflow-x-auto">
+              <div className="min-w-[42rem]">
               <div className="grid grid-cols-[minmax(0,1.8fr)_minmax(7rem,0.9fr)_7.5rem_3.5rem_5.5rem_auto] gap-3 border-b border-(--ui-stroke-secondary) px-2 py-1.5 text-[0.6875rem] text-(--ui-text-tertiary)">
                 <span>商品</span>
                 <span>店铺</span>
@@ -212,11 +213,12 @@ export function ProductsPage() {
                   </li>
                 ))}
               </ul>
+              </div>
             </div>
           ) : null}
 
           {pageData ? (
-            <div className="flex items-center justify-between gap-3 pt-1 text-xs text-(--ui-text-secondary)">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1 text-xs text-(--ui-text-secondary)">
               <span className="tabular-nums">
                 共 {pageData.total} 件，第 {pageData.total === 0 ? 1 : page} / {pageCount} 页
               </span>

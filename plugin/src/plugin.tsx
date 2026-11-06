@@ -10,7 +10,7 @@ import {
   syncLocationFromPath,
   toPath
 } from './registry'
-import { restoreWorkbenchPath, watchWorkbenchPath } from './restore'
+import { installPathRestore } from './restore'
 import { WorkbenchPage } from './WorkbenchPage'
 import { WorkbenchPane } from './WorkbenchPane'
 
@@ -38,11 +38,6 @@ function setupWorkbenchPlugin(ctx: PluginContext) {
   setNavigator(path => {
     host.navigate(path)
   })
-
-  // 外部插件比内置路由晚加载。刷新时宿主的 path="*" 会先把地址拉回新对话，
-  // 这里用刷新前记下的路径再跳回去。直接粘贴地址打开新窗口没有这份记录，回不来。
-  restoreWorkbenchPath()
-  const stopWatchingPath = watchWorkbenchPath()
 
   // 3. 同步当前路由位置：
   // Hermes SDK (apps/desktop/src/sdk/index.ts) 目前未在 host.state 中暴露当前路由路径 atom，
@@ -97,6 +92,11 @@ function setupWorkbenchPlugin(ctx: PluginContext) {
       })
     }
   }
+
+  // 外部插件比内置路由晚加载。刷新时宿主的 path="*" 会先把地址拉回新对话。
+  // 路由注册完再跳回去，否则这次跳转会被兜底路由立刻改回 #/。
+  // 直接粘贴地址打开新窗口没有 sessionStorage 记录，回不来。
+  const stopWatchingPath = installPathRestore()
 
   const cleanup = () => {
     stopWatchingPath()

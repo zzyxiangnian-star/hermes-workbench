@@ -104,7 +104,8 @@ export interface ImportResult {
   rows_failed: number
   errors: ImportErrorRow[]
   created_at: string
-  rules: RulesRunResult | null
+  rules?: RulesRunResult | null
+  installs?: { created: number; cancelled: number } | null
 }
 
 export interface ProductQuery {

@@ -68,7 +68,7 @@ export function SideDrawer({
         </Button>
         <div className="min-h-0 flex-1 overflow-y-auto p-3">{children}</div>
         {footer ? (
-          <footer className="flex items-center justify-end gap-2 border-t border-(--ui-stroke-secondary) p-3">
+          <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-(--ui-stroke-secondary) p-3">
             {footer}
           </footer>
         ) : null}
