@@ -13,8 +13,10 @@ if str(ROOT) not in sys.path:
 from app.models import Base
 
 config = context.config
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# 只有直接跑 alembic 命令时才按 alembic.ini 配日志。随 workbench-api 启动时不能配：
+# fileConfig 默认会关掉已有的 logger，uvicorn 的“已启动”就不打印了，看起来像卡在最后一条迁移上。
+if config.config_file_name is not None and not os.environ.get("WB_ALEMBIC_URL_LOCK"):
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 if not os.environ.get("WB_ALEMBIC_URL_LOCK"):
     env_url = os.environ.get("WORKBENCH_DATABASE_URL")
