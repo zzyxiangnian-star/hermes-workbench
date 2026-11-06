@@ -1,5 +1,10 @@
 import { Codicon, EmptyState } from '@hermes/plugin-sdk'
+import { ensureRunningCampaignPolling, getRunningCampaignCount } from '../api/campaign-count'
+import { AssetsPage } from '../pages/assets/AssetsPage'
+import { CampaignsPage } from '../pages/campaigns/CampaignsPage'
 import type { WorkbenchDef } from '../types'
+
+ensureRunningCampaignPolling()
 
 export const brandWorkbench: WorkbenchDef = {
   id: 'brand',
@@ -10,15 +15,8 @@ export const brandWorkbench: WorkbenchDef = {
       id: 'campaigns',
       label: '活动',
       codicon: 'calendar',
-      render: () => (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState
-            icon={<Codicon name="calendar" size="1.25rem" />}
-            title="活动"
-            description="管理品牌活动排期、关键节点倒计时、各环节物料齐套进度与活动复盘。"
-          />
-        </div>
-      )
+      badge: () => getRunningCampaignCount(),
+      render: () => <CampaignsPage />
     },
     {
       id: 'content',
@@ -52,15 +50,7 @@ export const brandWorkbench: WorkbenchDef = {
       id: 'assets',
       label: '资料',
       codicon: 'library',
-      render: () => (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState
-            icon={<Codicon name="library" size="1.25rem" />}
-            title="资料"
-            description="集中存放产品参数表、品牌视觉规范、禁用词库与可商用素材，供起草和审查直接引用。"
-          />
-        </div>
-      )
+      render: () => <AssetsPage />
     }
   ]
 }

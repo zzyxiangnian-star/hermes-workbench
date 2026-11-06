@@ -104,6 +104,26 @@ function PreviewApp() {
           >
             商品页
           </Button>
+          <Button
+            size="xs"
+            variant={location?.workbench === 'brand' && location.page === 'campaigns' ? 'default' : 'outline'}
+            onClick={() => {
+              setEmptyMode(false)
+              openPage({ workbench: 'brand', page: 'campaigns' })
+            }}
+          >
+            活动页
+          </Button>
+          <Button
+            size="xs"
+            variant={location?.workbench === 'brand' && location.page === 'assets' ? 'default' : 'outline'}
+            onClick={() => {
+              setEmptyMode(false)
+              openPage({ workbench: 'brand', page: 'assets' })
+            }}
+          >
+            资料页
+          </Button>
 
           <Button
             size="xs"

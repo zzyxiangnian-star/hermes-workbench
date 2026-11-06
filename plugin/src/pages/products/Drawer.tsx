@@ -8,7 +8,8 @@ export function SideDrawer({
   description,
   onClose,
   children,
-  footer
+  footer,
+  widthClass = 'max-w-md'
 }: {
   open: boolean
   title: string
@@ -16,6 +17,7 @@ export function SideDrawer({
   onClose: () => void
   children: ReactNode
   footer?: ReactNode
+  widthClass?: string
 }) {
   useEffect(() => {
     if (!open) return
@@ -42,7 +44,10 @@ export function SideDrawer({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="absolute inset-y-0 right-0 flex h-full w-full max-w-md flex-col border-l border-(--ui-stroke-secondary) bg-(--ui-bg-elevated) text-(--ui-text-primary) shadow-md"
+        className={cn(
+          'absolute inset-y-0 right-0 flex h-full w-full flex-col border-l border-(--ui-stroke-secondary) bg-(--ui-bg-elevated) text-(--ui-text-primary) shadow-md',
+          widthClass
+        )}
       >
         <header className="flex items-start gap-3 border-b border-(--ui-stroke-secondary) p-3 pr-10">
           <div className="min-w-0">

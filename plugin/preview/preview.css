@@ -1,3 +1,9 @@
 @import "tailwindcss";
 @source "../src";
 
+/* 预览不在 Hermes 里，补上样式表里的 destructive，text-destructive 才能显色。 */
+@theme {
+  --color-destructive: #cf2d56;
+  --color-destructive-foreground: #ffffff;
+}
+

@@ -63,6 +63,9 @@ export interface IssueSummary {
     open_count: number
   }>
   total_open: number
+  must_open: number
+  warn_open: number
+  products_with_open: number
 }
 
 export interface RuleParams {
@@ -109,6 +112,7 @@ export interface ProductQuery {
   brand?: string
   q?: string
   has_issue?: boolean
+  issue_level?: IssueLevel
   page?: number
   pageSize?: number
 }
@@ -117,6 +121,7 @@ export interface IssueQuery {
   status?: IssueStatus
   level?: IssueLevel
   shop_id?: number
+  product_id?: number
 }
 
 function queryString(params: Record<string, string | number | boolean | undefined>): string {
@@ -144,6 +149,7 @@ export function listProducts(query: ProductQuery = {}): Promise<ProductPage> {
       brand: query.brand,
       q: query.q,
       has_issue: query.has_issue,
+      issue_level: query.issue_level,
       page: query.page,
       page_size: query.pageSize
     })}`
@@ -155,13 +161,14 @@ export function listIssues(query: IssueQuery = {}): Promise<Issue[]> {
     `/api/issues${queryString({
       status: query.status,
       level: query.level,
-      shop_id: query.shop_id
+      shop_id: query.shop_id,
+      product_id: query.product_id
     })}`
   )
 }
 
-export function getIssueSummary(): Promise<IssueSummary> {
-  return apiFetch<IssueSummary>('/api/issues/summary')
+export function getIssueSummary(shopId?: number): Promise<IssueSummary> {
+  return apiFetch<IssueSummary>(`/api/issues/summary${queryString({ shop_id: shopId })}`)
 }
 
 export function patchIssue(
@@ -212,40 +219,13 @@ export async function listProductsForView(args: {
   page: number
   pageSize: number
 }): Promise<ProductPage> {
-  const q = args.q?.trim() || undefined
-  const shop_id = args.shopId
-  if (args.segment === 'must' || args.segment === 'warn') {
-    const issues = await listIssues({ status: 'open', level: args.segment, shop_id })
-    const ids = new Set(issues.map(issue => issue.product_id))
-    const all = await listAllProducts({ shop_id, q, has_issue: true })
-    const filtered = all.filter(product => ids.has(product.id))
-    const start = (args.page - 1) * args.pageSize
-    return {
-      items: filtered.slice(start, start + args.pageSize),
-      total: filtered.length,
-      page: args.page,
-      page_size: args.pageSize
-    }
-  }
+  const level = args.segment === 'must' || args.segment === 'warn' ? args.segment : undefined
   return listProducts({
-    shop_id,
-    q,
+    shop_id: args.shopId,
+    q: args.q?.trim() || undefined,
     has_issue: args.segment === 'issue' ? true : undefined,
+    issue_level: level,
     page: args.page,
     pageSize: args.pageSize
   })
-}
-
-async function listAllProducts(query: Omit<ProductQuery, 'page' | 'pageSize'>): Promise<Product[]> {
-  const pageSize = 100
-  const first = await listProducts({ ...query, page: 1, pageSize })
-  if (first.items.length >= first.total) return first.items
-  const items = [...first.items]
-  const pages = Math.min(50, Math.ceil(first.total / pageSize))
-  for (let page = 2; page <= pages; page += 1) {
-    const next = await listProducts({ ...query, page, pageSize })
-    items.push(...next.items)
-    if (items.length >= first.total) break
-  }
-  return items
 }

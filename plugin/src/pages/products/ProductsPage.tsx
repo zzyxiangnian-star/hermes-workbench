@@ -1,10 +1,9 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Badge,
   Button,
   EmptyState,
   ErrorState,
-  Input,
   Loader,
   SearchField,
   SegmentedControl,
@@ -20,6 +19,7 @@ import {
 import { isOfflineError } from '../../api/client'
 import { refreshOpenIssueCount } from '../../api/open-count'
 import {
+  getIssueSummary,
   listIssues,
   listProductsForView,
   listShops,
@@ -28,7 +28,9 @@ import {
   type ProductSegment
 } from '../../api/products'
 import { useQuery } from '../../api/useQuery'
-import { setApiBase, useApiBase } from '../../settings'
+import { useApiBase } from '../../settings'
+import { HeaderActions } from '../HeaderActions'
+import { OfflineNotice } from '../OfflineNotice'
 import { ImportDialog } from './ImportDialog'
 import { IssueDrawer } from './IssueDrawer'
 import { formatAmount, levelLabel, platformMark, platformName } from './labels'
@@ -53,10 +55,6 @@ export function ProductsPage() {
   const [importOpen, setImportOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
   const [active, setActive] = useState<Product | null>(null)
-  const [addressDraft, setAddressDraft] = useState(apiBase)
-  const [editingAddress, setEditingAddress] = useState(false)
-  const [addressError, setAddressError] = useState<string | null>(null)
-
   useEffect(() => {
     const timer = window.setTimeout(() => setQ(qInput.trim()), 300)
     return () => window.clearTimeout(timer)
@@ -72,6 +70,7 @@ export function ProductsPage() {
   }, [q])
 
   const shopsQuery = useQuery(() => listShops(), [apiBase])
+  const summaryQuery = useQuery(() => getIssueSummary(shopId), [apiBase, shopId])
   const issuesQuery = useQuery(
     () => listIssues({ status: 'open', shop_id: shopId }),
     [apiBase, shopId]
@@ -89,6 +88,7 @@ export function ProductsPage() {
 
   const reloadAll = () => {
     shopsQuery.reload()
+    summaryQuery.reload()
     issuesQuery.reload()
     productsQuery.reload()
     void refreshOpenIssueCount()
@@ -97,8 +97,8 @@ export function ProductsPage() {
   const shops = shopsQuery.data ?? []
   const pageData = productsQuery.data
   const flags = useMemo(() => flagsByProduct(issuesQuery.data ?? []), [issuesQuery.data])
-  const summary = useMemo(() => summarize(issuesQuery.data ?? []), [issuesQuery.data])
-  const error = productsQuery.error ?? issuesQuery.error ?? shopsQuery.error
+  const summary = summaryQuery.data
+  const error = productsQuery.error ?? summaryQuery.error ?? issuesQuery.error ?? shopsQuery.error
   const offline = isOfflineError(error)
   const loading = !error && (productsQuery.loading || issuesQuery.loading) && !pageData
   const pageCount = Math.max(1, Math.ceil((pageData?.total ?? 0) / PAGE_SIZE))
@@ -121,55 +121,7 @@ export function ProductsPage() {
       </HeaderActions>
 
       {offline ? (
-        <div className="flex flex-1 items-center justify-center py-10">
-          <EmptyState
-            title="没有连上工作台服务"
-            description={
-              error instanceof Error && error.message && error.message !== '没有连上工作台服务'
-                ? `${error.message}。当前地址 ${apiBase}`
-                : `当前地址 ${apiBase}`
-            }
-          >
-            <Button size="sm" variant="outline" onClick={reloadAll}>
-              重试
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => {
-              setAddressDraft(apiBase)
-              setAddressError(null)
-              setEditingAddress(true)
-            }}>
-              更改地址
-            </Button>
-          </EmptyState>
-        </div>
-      ) : null}
-
-      {offline && editingAddress ? (
-        <form
-          className="mx-auto flex w-full max-w-sm items-center gap-2"
-          onSubmit={event => {
-            event.preventDefault()
-            const ok = setApiBase(addressDraft)
-            if (!ok) {
-              setAddressError('地址需要以 http:// 或 https:// 开头')
-              return
-            }
-            setEditingAddress(false)
-            setAddressError(null)
-          }}
-        >
-          <Input
-            aria-label="工作台服务地址"
-            value={addressDraft}
-            onChange={event => setAddressDraft(event.target.value)}
-          />
-          <Button size="sm" type="submit">
-            保存
-          </Button>
-        </form>
-      ) : null}
-      {offline && addressError ? (
-        <p className="text-center text-xs text-(--ui-error)">{addressError}</p>
+        <OfflineNotice detail={error instanceof Error ? error.message : undefined} onRetry={reloadAll} />
       ) : null}
 
       {!offline && error ? (
@@ -188,9 +140,9 @@ export function ProductsPage() {
       {!offline && !error ? (
         <>
           <div className="flex flex-wrap items-center gap-2 text-xs text-(--ui-text-secondary)">
-            <SummaryChip label="必须处理" value={issuesQuery.loading && !issuesQuery.data ? undefined : summary.must} tone="destructive" />
-            <SummaryChip label="提醒" value={issuesQuery.loading && !issuesQuery.data ? undefined : summary.warn} tone="warn" />
-            <SummaryChip label="涉及商品" value={issuesQuery.loading && !issuesQuery.data ? undefined : summary.products} tone="outline" />
+            <SummaryChip label="必须处理" value={summaryQuery.loading && !summary ? undefined : summary?.must_open} tone="destructive" />
+            <SummaryChip label="提醒" value={summaryQuery.loading && !summary ? undefined : summary?.warn_open} tone="warn" />
+            <SummaryChip label="涉及商品" value={summaryQuery.loading && !summary ? undefined : summary?.products_with_open} tone="outline" />
             {productsQuery.loading && pageData ? <Loader /> : null}
           </div>
 
@@ -298,28 +250,6 @@ export function ProductsPage() {
   )
 }
 
-function HeaderActions({ children }: { children: ReactNode }) {
-  // Hermes 插件运行时没有 react-dom，不能用 createPortal。
-  // 把这一行挂进 W01 的页头操作区；卸载前先放回来，避免 React 删节点失败。
-  const holder = useRef<HTMLDivElement>(null)
-  useLayoutEffect(() => {
-    const node = holder.current
-    const slot = document.querySelector('[data-slot="actions"]')
-    if (!node || !(slot instanceof HTMLElement)) return
-    const parent = node.parentNode
-    const next = node.nextSibling
-    slot.appendChild(node)
-    return () => {
-      if (parent?.isConnected) parent.insertBefore(node, next)
-    }
-  }, [])
-  return (
-    <div ref={holder} className="flex shrink-0 items-center gap-2">
-      {children}
-    </div>
-  )
-}
-
 function SummaryChip({
   label,
   value,
@@ -373,7 +303,7 @@ function ProductRow({
         <span className="truncate">{product.shop_name}</span>
       </span>
       <span className="tabular-nums">
-        <span className={low ? 'text-(--ui-error)' : undefined}>{formatAmount(product.price)}</span>
+        <span className={low ? 'text-destructive' : undefined}>{formatAmount(product.price)}</span>
         <span className="text-(--ui-text-tertiary)">
           {' / '}
           {product.floor_price == null ? '—' : formatAmount(product.floor_price)}
@@ -413,14 +343,3 @@ function flagsByProduct(issues: Issue[]): Map<number, { must: boolean; warn: boo
   return map
 }
 
-function summarize(issues: Issue[]): { must: number; warn: number; products: number } {
-  const products = new Set<number>()
-  let must = 0
-  let warn = 0
-  for (const issue of issues) {
-    products.add(issue.product_id)
-    if (issue.level === 'must') must += 1
-    if (issue.level === 'warn') warn += 1
-  }
-  return { must, warn, products: products.size }
-}

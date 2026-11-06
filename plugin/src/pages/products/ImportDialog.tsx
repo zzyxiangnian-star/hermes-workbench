@@ -227,7 +227,7 @@ export function ImportDialog({
               />
             </label>
 
-            {error ? <p className="text-xs text-(--ui-error)">{error}</p> : null}
+            {error ? <p className="text-xs text-destructive">{error}</p> : null}
 
             <DialogFooter>
               <Button variant="outline" onClick={onClose}>

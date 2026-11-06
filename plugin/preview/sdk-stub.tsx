@@ -79,9 +79,9 @@ export function Badge({
     variant === 'outline'
       ? 'border border-(--ui-stroke-secondary) bg-(--ui-bg-quinary) text-(--ui-text-secondary)'
       : variant === 'destructive'
-        ? 'bg-[color-mix(in_srgb,var(--ui-error)_14%,transparent)] text-(--ui-error)'
+        ? 'bg-destructive/10 text-destructive'
         : variant === 'warn'
-          ? 'bg-[color-mix(in_srgb,var(--ui-warn)_16%,transparent)] text-(--ui-warn)'
+          ? 'bg-amber-500/10 text-amber-600 dark:text-amber-300'
           : variant === 'default'
             ? 'bg-(--ui-accent) text-(--ui-bg-editor)'
             : 'bg-(--ui-bg-quinary) text-(--ui-text-secondary)'
@@ -689,7 +689,7 @@ export function ConfirmDialog({
         <h2 className="text-sm font-medium">{title}</h2>
         {description ? <p className="mt-1 text-xs leading-relaxed text-(--ui-text-tertiary)">{description}</p> : null}
         {children ? <div className="mt-3">{children}</div> : null}
-        {error ? <p className="mt-2 text-xs text-(--ui-error)">{error}</p> : null}
+        {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="outline" size="sm" disabled={busy} onClick={onClose}>
             {cancelLabel}

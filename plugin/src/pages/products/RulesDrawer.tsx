@@ -137,7 +137,7 @@ export function RulesDrawer({
       ) : null}
 
       {notice ? <p className="mt-3 text-xs text-(--ui-text-secondary)">{notice}</p> : null}
-      {actionError ? <p className="mt-3 text-xs text-(--ui-error)">{actionError}</p> : null}
+      {actionError ? <p className="mt-3 text-xs text-destructive">{actionError}</p> : null}
     </SideDrawer>
   )
 }

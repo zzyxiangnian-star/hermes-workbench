@@ -43,10 +43,10 @@ export function IssueDrawer({
     let cancelled = false
     setLoadedFor(null)
     setError(null)
-    Promise.all([listIssues({ shop_id: product.shop_id }), listRules()])
+    Promise.all([listIssues({ product_id: product.id }), listRules()])
       .then(([issueRows, ruleRows]) => {
         if (cancelled) return
-        const mine = issueRows.filter(issue => issue.product_id === product.id)
+        const mine = issueRows
         setIssues(mine)
         setRules(ruleRows)
         setNotes(Object.fromEntries(mine.map(issue => [issue.id, issue.note ?? ''])))
@@ -93,7 +93,7 @@ export function IssueDrawer({
             <FieldText label="编码">{product.product_code || '—'}</FieldText>
             <FieldText label="货号">{product.sku || '—'}</FieldText>
             <FieldText label="价格 / 底价">
-              <span className={belowFloor(product) ? 'text-(--ui-error)' : undefined}>
+              <span className={belowFloor(product) ? 'text-destructive' : undefined}>
                 {formatAmount(product.price)}
               </span>
               {' / '}
@@ -127,7 +127,7 @@ export function IssueDrawer({
             <p className="text-xs text-(--ui-text-tertiary)">这个商品没有问题记录。</p>
           ) : null}
 
-          {actionError ? <p className="text-xs text-(--ui-error)">{actionError}</p> : null}
+          {actionError ? <p className="text-xs text-destructive">{actionError}</p> : null}
 
           {loadedFor === product.id && !error ? (
           <ul className="flex flex-col gap-3">
