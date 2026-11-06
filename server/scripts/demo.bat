@@ -6,9 +6,16 @@ cd /d "%~dp0.."
 if not exist .venv\Scripts\python.exe (
   py -3 -m venv .venv 2>nul || python -m venv .venv
 )
-.venv\Scripts\python.exe -m pip install -q -e .
+rem 只在第一次和依赖有变化（pyproject.toml 改了）时联网安装，平时直接启动。
+fc /b pyproject.toml .venv\pyproject.installed >nul 2>&1
 if errorlevel 1 (
-  if exist .venv\Scripts\workbench-api.exe (echo 依赖更新失败（可能没联网），先用已装好的版本) else (echo 依赖安装失败，请检查网络后重试 & pause & exit /b 1)
+  echo 正在安装或更新依赖……
+  .venv\Scripts\python.exe -m pip install -q -e .
+  if errorlevel 1 (
+    if exist .venv\Scripts\workbench-api.exe (echo 依赖更新失败（可能没联网），先用已装好的版本启动) else (echo 依赖安装失败，请检查网络后重试 & pause & exit /b 1)
+  ) else (
+    copy /y pyproject.toml .venv\pyproject.installed >nul
+  )
 )
 .venv\Scripts\python.exe -m app.demo || (pause & exit /b 1)
 set WORKBENCH_DATABASE_URL=sqlite:///%CD:\=/%/data/demo.db

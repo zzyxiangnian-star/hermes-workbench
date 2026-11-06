@@ -12,9 +12,16 @@ if not exist .venv\Scripts\python.exe (
     exit /b 1
   )
 )
-.venv\Scripts\python.exe -m pip install -q -e .
+rem 只在第一次和依赖有变化（pyproject.toml 改了）时联网安装，平时直接启动。
+fc /b pyproject.toml .venv\pyproject.installed >nul 2>&1
 if errorlevel 1 (
-  if exist .venv\Scripts\workbench-api.exe (echo 依赖更新失败（可能没联网），先用已装好的版本启动) else (echo 依赖安装失败，请检查网络后重试 & pause & exit /b 1)
+  echo 正在安装或更新依赖……
+  .venv\Scripts\python.exe -m pip install -q -e .
+  if errorlevel 1 (
+    if exist .venv\Scripts\workbench-api.exe (echo 依赖更新失败（可能没联网），先用已装好的版本启动) else (echo 依赖安装失败，请检查网络后重试 & pause & exit /b 1)
+  ) else (
+    copy /y pyproject.toml .venv\pyproject.installed >nul
+  )
 )
 if exist scripts\env.bat call scripts\env.bat
 echo 工作台后端已启动：http://127.0.0.1:8000  （关闭这个窗口就停止）
