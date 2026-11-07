@@ -275,7 +275,7 @@ def _brand(api: _Api, rng: random.Random, end: date) -> None:
             "use_template": True,
         },
     )
-    api.post(
+    running = api.post(
         "/api/campaigns",
         {
             "name": "木屿 秋冬换季",
@@ -287,6 +287,8 @@ def _brand(api: _Api, rng: random.Random, end: date) -> None:
             "use_template": True,
         },
     )
+    # 已经开始的活动，状态也要是“进行中”，不然列表上按日期显示进行中、接口里却是筹备中
+    api.patch(f"/api/campaigns/{running['id']}", {"status": "running"})
 
     published = api.post(
         "/api/contents",
@@ -624,7 +626,10 @@ def main() -> None:
     print()
     print("用演示库启动：")
     print(f'  set WORKBENCH_DATABASE_URL=sqlite:///{args.db.resolve().as_posix()}   (PowerShell 用 $env:WORKBENCH_DATABASE_URL="…")')
+    print(f"  set WB_ASSET_DIR={(args.db.resolve().parent / (args.db.stem + '-assets'))}")
+    print("  set WB_SCHEDULER=off")
     print("  workbench-api")
+    print("（Windows 上直接双击 server\\scripts\\demo.bat，上面这些它会自动设好）")
 
 
 if __name__ == "__main__":

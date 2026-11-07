@@ -67,7 +67,7 @@ def main() -> None:
         archive.writestr(f"{TOP}/说明.md", (ROOT / "docs" / "交付说明.md").read_bytes())
         archive.writestr(f"{TOP}/版本.txt", info.encode("utf-8"))
         archive.writestr(f"{TOP}/plugin.js", plugin)
-        for name in tracked("server") + tracked("bots"):
+        for name in tracked("server") + tracked("bots") + tracked("docs/CONTRACT-mcp.md"):
             data = (ROOT / name).read_bytes()
             if name.endswith((".bat", ".cmd")):
                 data = crlf(data)
