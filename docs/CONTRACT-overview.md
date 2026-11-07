@@ -92,7 +92,7 @@
 
 `GET /api/overview/trend?days=7&shop_id=1&metric=visitors`
 
-`metric` 必须是 `visitors`、`orders`、`sales_amount`、`conversion_rate`、`avg_order_value`、`ad_spend`、`ad_gmv`、`roi`。不认识时 `400`，`code` 为 `invalid_metric`。`days` 默认 30，范围 1 到 366。序列含结束日，结束日同样是最晚有数据的那天。没有记录的日期，人数和金额是 0，比率是 `null`。
+`metric` 必须是 `visitors`、`orders`、`sales_amount`、`conversion_rate`、`avg_order_value`、`ad_spend`、`ad_gmv`、`roi`。不认识时 `400`，`code` 为 `invalid_metric`。`days` 默认 30，范围 1 到 366。序列含结束日。可传 `date` 指定结束日（和总览选的日期对齐）；不传时结束日是最晚有数据的那天。没有记录的日期，人数和金额是 0，比率是 `null`。
 
 ```json
 {
@@ -148,7 +148,7 @@
 
 `PATCH /api/ad-rules/{id}` 只改 `params` 和 `enabled`，方式和商品规则一样。
 
-`POST /api/ad-rules/run` 手动跑。去重和自动转已处理与商品问题相同：同一规则、店铺、工具、计划、日期已经有 `open` 的不另建；`ignored` 且问题还在也不另建；不再成立时（包括原先 `ignored` 的）改成 `resolved`。
+`POST /api/ad-rules/run` 手动跑。只对最近 7 天（以投放表里最晚一天往前数，含当天）开提醒和自动转已处理；更早的提醒保持原状，改了阈值不会把旧数据翻出一堆提醒。去重和自动转已处理与商品问题相同：同一规则、店铺、工具、计划、日期已经有 `open` 的不另建；`ignored` 且问题还在也不另建；不再成立时（包括原先 `ignored` 的）改成 `resolved`。
 
 样表在默认参数下会开两条：`万相台·双11预热 11-04 ROI 1.3，低于 2`，以及 `万相台·爆发计划 11-04 花费 400，高于前 7 天平均 100 的 150%`。
 

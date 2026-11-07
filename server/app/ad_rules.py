@@ -60,13 +60,23 @@ def normalize_params(kind: str, params: dict[str, Any] | None) -> dict[str, Any]
     return merged
 
 
+# 只对最近几天开提醒。改了阈值不会把一个月前的数据翻出来一堆提醒；更早的提醒保持原状。
+CHECK_DAYS = 7
+
+
 def run_ad_rules(session: Session) -> dict[str, int]:
     rules = session.scalars(select(AdRule).where(AdRule.enabled.is_(True)).order_by(AdRule.id)).all()
     rows = session.scalars(select(AdSpend)).all()
+    latest = max((row.date for row in rows), default=None)
+    cutoff = latest - timedelta(days=CHECK_DAYS - 1) if latest is not None else None
     opened = updated = resolved = 0
     for rule in rules:
         params = normalize_params(rule.kind, rule.params)
-        violations = evaluate(rule.kind, params, rows)
+        violations = {
+            key: message
+            for key, message in evaluate(rule.kind, params, rows).items()
+            if cutoff is None or key[3] >= cutoff
+        }
         active = session.scalars(
             select(Alert).where(
                 Alert.kind == rule.kind,
@@ -109,6 +119,8 @@ def run_ad_rules(session: Session) -> dict[str, int]:
             opened += 1
         now = utcnow()
         for alert in active:
+            if cutoff is not None and alert.date < cutoff:
+                continue
             if _alert_key(alert) not in seen:
                 alert.status = "resolved"
                 alert.resolved_at = now

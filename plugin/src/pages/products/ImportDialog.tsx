@@ -17,6 +17,7 @@ import {
 } from '@hermes/plugin-sdk'
 import { ApiError } from '../../api/client'
 import { importOrders } from '../../api/installs'
+import { importAdSpend, importMetrics } from '../../api/overview'
 import {
   createShop,
   getFolderImport,
@@ -31,20 +32,52 @@ import { PLATFORM_NAME, platformName } from './labels'
 
 const PLATFORMS = ['tmall', 'jd', 'pdd', 'douyin'] as const
 
+export type ImportKind = 'products' | 'orders' | 'metrics' | 'ad_spend'
+
+const KIND_LABEL: Record<ImportKind, string> = {
+  products: '商品',
+  orders: '订单',
+  metrics: '经营',
+  ad_spend: '投放'
+}
+
+const KIND_TITLE: Record<ImportKind, string> = {
+  products: '导入报表',
+  orders: '导入订单',
+  metrics: '导入经营表',
+  ad_spend: '导入投放表'
+}
+
+const KIND_HINT: Record<ImportKind, string> = {
+  products: '选择店铺和 xlsx / csv 文件。导入完成后会自动按规则检查。',
+  orders: '选择店铺和订单表。买了需安装商品的订单会生成工单。',
+  metrics: '选择店铺和后台导出的经营日报（日期、访客、订单、销售额）。同一天再导会覆盖。',
+  ad_spend: '选择店铺和投放报表（日期、工具、计划、花费、成交）。导入后自动检查投放规则。'
+}
+
+const UPLOAD: Record<ImportKind, (shopId: number, file: File) => Promise<ImportResult>> = {
+  products: importProducts,
+  orders: importOrders,
+  metrics: importMetrics,
+  ad_spend: importAdSpend
+}
+
 export function ImportDialog({
   open,
   shops,
   initialKind = 'products',
+  kinds = ['products', 'orders'],
   onClose,
   onDone
 }: {
   open: boolean
   shops: Shop[]
-  initialKind?: 'products' | 'orders'
+  initialKind?: ImportKind
+  kinds?: ImportKind[]
   onClose: () => void
   onDone: () => void
 }) {
-  const [kind, setKind] = useState<'products' | 'orders'>(initialKind)
+  const [kind, setKind] = useState<ImportKind>(initialKind)
   const [shopId, setShopId] = useState<string>('')
   const [createdShops, setCreatedShops] = useState<Shop[]>([])
   const [creating, setCreating] = useState(false)
@@ -102,7 +135,7 @@ export function ImportDialog({
     setBusy(true)
     setError(null)
     try {
-      const imported = kind === 'orders' ? await importOrders(Number(shopId), file) : await importProducts(Number(shopId), file)
+      const imported = await UPLOAD[kind](Number(shopId), file)
       setResult(imported)
       onDone()
     } catch (reason) {
@@ -121,12 +154,8 @@ export function ImportDialog({
     <Dialog open={open} onOpenChange={next => { if (!next) onClose() }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{kind === 'orders' ? '导入订单' : '导入报表'}</DialogTitle>
-          <DialogDescription>
-            {kind === 'orders'
-              ? '选择店铺和订单表。买了需安装商品的订单会生成工单。'
-              : '选择店铺和 xlsx / csv 文件。导入完成后会自动按规则检查。'}
-          </DialogDescription>
+          <DialogTitle>{KIND_TITLE[kind]}</DialogTitle>
+          <DialogDescription>{KIND_HINT[kind]}</DialogDescription>
         </DialogHeader>
 
         <FolderImportRow open={open} />
@@ -136,6 +165,7 @@ export function ImportDialog({
             <p className="text-sm text-(--ui-text-primary)">
               成功 {result.rows_ok} 行，失败 {result.rows_failed} 行
               {result.installs ? `，新建工单 ${result.installs.created} 张` : ''}
+              {kind === 'ad_spend' && result.rules ? `，新增投放提醒 ${result.rules.opened} 条` : ''}
             </p>
             {result.errors.length > 0 ? (
               <ul className="max-h-48 overflow-y-auto border border-(--ui-stroke-secondary) text-(--ui-text-secondary)">
@@ -153,21 +183,20 @@ export function ImportDialog({
                   onClose()
                 }}
               >
-                {kind === 'orders' ? '完成' : '查看商品'}
+                {kind === 'products' ? '查看商品' : '完成'}
               </Button>
             </DialogFooter>
           </div>
         ) : (
           <div className="flex flex-col gap-3">
-            <SegmentedControl
-              options={[
-                { id: 'products', label: '商品' },
-                { id: 'orders', label: '订单' }
-              ]}
-              value={kind}
-              sizing="content"
-              onChange={value => setKind(value)}
-            />
+            {kinds.length > 1 ? (
+              <SegmentedControl
+                options={kinds.map(id => ({ id, label: KIND_LABEL[id] }))}
+                value={kind}
+                sizing="content"
+                onChange={value => setKind(value)}
+              />
+            ) : null}
             {knownShops.length > 0 && !creating ? (
               <label className="flex flex-col gap-1 text-xs text-(--ui-text-secondary)">
                 店铺

@@ -8,6 +8,7 @@ import { WorkbenchSettings } from './pages/WorkbenchSettings'
 import { useOpenInquiryCount } from './api/inquiry-count'
 import { useNeedsActionCount } from './api/install-count'
 import { useOpenIssueCount } from './api/open-count'
+import { useOpenAlertCount } from './api/alert-count'
 import { openPage, useLocation, useWorkbenches } from './registry'
 import type { WorkbenchDef, WorkbenchPageDef } from './types'
 
@@ -291,6 +292,7 @@ export function WorkbenchPane() {
   const workbenches = useWorkbenches()
   const location = useLocation()
   useOpenIssueCount()
+  useOpenAlertCount()
   useNeedsActionCount()
   useOpenInquiryCount()
   useRunningCampaignCount()

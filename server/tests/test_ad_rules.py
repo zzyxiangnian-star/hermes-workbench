@@ -108,3 +108,21 @@ def test_ad_rule_summary_counts_open_alerts(client):
         ("另一家", 0),
     ]
     assert alerts(client, shop_id=other["id"]) == []
+
+
+def test_ad_rules_only_open_alerts_for_recent_days(client):
+    shop = create_shop(client)
+    # 10-20 很差但距最新一天 11-04 超过 7 天，不开提醒；11-04 照常开。
+    import_ads(
+        client,
+        shop["id"],
+        ("2026-10-20", "万相台", "老计划", 500, 100, 1, 10),
+        ("2026-11-04", "万相台", "新计划", 500, 100, 1, 10),
+    )
+    opened = alerts(client, status="open")
+    assert [(item["campaign"], item["date"]) for item in opened] == [("新计划", "2026-11-04")]
+
+    # 窗口外已有的提醒不会被自动转成已处理。
+    import_ads(client, shop["id"], ("2026-11-20", "万相台", "新计划", 500, 2000, 1, 10), name="later.csv")
+    still = alerts(client, status="open")
+    assert [(item["campaign"], item["date"]) for item in still] == [("新计划", "2026-11-04")]

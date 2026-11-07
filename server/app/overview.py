@@ -92,12 +92,14 @@ def build_overview(
     )
 
 
-def build_trend(session: Session, *, days: int, shop_id: int | None, metric: str) -> dict:
+def build_trend(
+    session: Session, *, days: int, shop_id: int | None, metric: str, day: date | None = None
+) -> dict:
     if metric not in METRICS:
         names = "、".join(METRICS)
         raise AppError(400, "invalid_metric", f"指标必须是 {names}")
     shop_ids = selected_shop_ids(session, shop_id, None)
-    end = latest_day(session, shop_ids)
+    end = day or latest_day(session, shop_ids)
     start = end - timedelta(days=days - 1)
     points = []
     cursor = start

@@ -86,6 +86,12 @@ def test_trend_and_ad_spend_list(client):
     assert points[-2] == {"date": "2026-11-03", "value": 1000}
     assert points[-1] == {"date": "2026-11-04", "value": 1200}
 
+    ended = client.get(
+        "/api/overview/trend",
+        params={"days": 2, "shop_id": shop["id"], "metric": "visitors", "date": "2026-11-03"},
+    )
+    assert [point["date"] for point in ended.json()["points"]] == ["2026-11-02", "2026-11-03"]
+
     unknown = client.get("/api/overview/trend", params={"metric": "profit"})
     assert unknown.status_code == 400
     assert unknown.json()["error"]["code"] == "invalid_metric"

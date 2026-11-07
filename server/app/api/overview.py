@@ -25,9 +25,10 @@ def overview_trend(
     days: int = Query(30, ge=1, le=366),
     shop_id: int | None = None,
     metric: str = "",
+    day: date | None = Query(None, alias="date"),
     session: Session = Depends(get_db),
 ) -> dict:
-    return build_trend(session, days=days, shop_id=shop_id, metric=metric)
+    return build_trend(session, days=days, shop_id=shop_id, metric=metric, day=day)
 
 
 @router.get("/ad-spend", response_model=list[AdSpendOut])
