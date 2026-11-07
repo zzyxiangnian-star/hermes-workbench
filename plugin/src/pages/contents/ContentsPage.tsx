@@ -7,7 +7,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  EmptyState,
   ErrorState,
   Input,
   SearchField,
@@ -27,6 +26,7 @@ import { createContent, listContents, type ContentItem } from '../../api/content
 import { listShops } from '../../api/products'
 import { useQuery } from '../../api/useQuery'
 import { useApiBase } from '../../settings'
+import { EmptyBlock } from '../EmptyBlock'
 import { HeaderActions } from '../HeaderActions'
 import { OfflineNotice } from '../OfflineNotice'
 import { formatTime } from '../products/labels'
@@ -158,7 +158,7 @@ function ContentsList({ onOpen }: { onOpen: (id: number) => void }) {
 
           {query.data && query.data.length === 0 ? (
             <div className="flex flex-1 items-center justify-center py-10">
-              <EmptyState
+              <EmptyBlock
                 title={filtered ? '没有符合条件的稿件' : '还没有稿件'}
                 description={filtered ? '换个筛选条件，或者清空搜索。' : '从主稿写起，再拆成各个平台的版本。'}
               >
@@ -167,7 +167,7 @@ function ContentsList({ onOpen }: { onOpen: (id: number) => void }) {
                     新建稿件
                   </Button>
                 )}
-              </EmptyState>
+              </EmptyBlock>
             </div>
           ) : null}
 

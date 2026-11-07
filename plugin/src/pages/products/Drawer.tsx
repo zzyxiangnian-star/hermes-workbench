@@ -45,7 +45,9 @@ export function SideDrawer({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'absolute inset-y-0 right-0 flex h-full w-full flex-col border-l border-(--ui-stroke-secondary) bg-(--ui-bg-elevated) text-(--ui-text-primary) shadow-md',
+          // 从右上角工具按钮下面开始：Hermes 的标题栏按钮浮在最上层（z-70），会盖住抽屉的关闭按钮。
+          // 页面区域里 --titlebar-height 被设成 0，所以按按钮本身的位置和高度来算。
+          'absolute top-[calc(var(--titlebar-controls-top,5px)+var(--titlebar-control-height,24px)+0.25rem)] right-0 bottom-0 flex w-full flex-col border-l border-(--ui-stroke-secondary) bg-(--ui-bg-elevated) text-(--ui-text-primary) shadow-md',
           widthClass
         )}
       >

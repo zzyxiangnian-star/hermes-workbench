@@ -123,36 +123,31 @@ function AlertList({
     }
   }
 
-  if (!loaded && !error) {
-    return (
-      <div className="flex items-center gap-2 text-xs text-(--ui-text-tertiary)">
-        <Loader />
-        正在读取提醒
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <ErrorState
-        title={isOfflineError(error) ? '没有连上工作台服务' : '提醒加载失败'}
-        description={error instanceof Error ? error.message : '请重试'}
-      >
-        <Button size="sm" variant="outline" onClick={() => setRevision(value => value + 1)}>
-          重试
-        </Button>
-      </ErrorState>
-    )
-  }
-
+  // 确认框要一直挂着：读取中提前 return 会把打开的确认框卸掉，留下挡住整页的遮罩。
   return (
     <div className="flex flex-col gap-3">
-      {alerts.length === 0 ? (
+      {!loaded && !error ? (
+        <div className="flex items-center gap-2 text-xs text-(--ui-text-tertiary)">
+          <Loader />
+          正在读取提醒
+        </div>
+      ) : null}
+      {error ? (
+        <ErrorState
+          title={isOfflineError(error) ? '没有连上工作台服务' : '提醒加载失败'}
+          description={error instanceof Error ? error.message : '请重试'}
+        >
+          <Button size="sm" variant="outline" onClick={() => setRevision(value => value + 1)}>
+            重试
+          </Button>
+        </ErrorState>
+      ) : null}
+      {loaded && !error && alerts.length === 0 ? (
         <p className="text-xs text-(--ui-text-tertiary)">没有未处理的投放提醒。</p>
       ) : null}
       {actionError ? <p className="text-xs text-destructive">{actionError}</p> : null}
       <ul className="flex flex-col gap-3">
-        {alerts.map(alert => (
+        {(loaded && !error ? alerts : []).map(alert => (
           <li key={alert.id} className="flex flex-col gap-2 border-b border-(--ui-stroke-secondary) pb-3">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="text-xs font-medium">
@@ -200,6 +195,7 @@ function AlertList({
           } catch (reason) {
             throw new Error(reason instanceof ApiError ? reason.message : '忽略失败')
           }
+          setIgnoreTarget(null)
           onChanged()
           setRevision(value => value + 1)
         }}

@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Button, EmptyState } from '@hermes/plugin-sdk'
+import { Button } from '@hermes/plugin-sdk'
+import { EmptyBlock } from './EmptyBlock'
+import { refreshAllCounts } from '../api/refresh-counts'
 import { useApiBase } from '../settings'
 import { WorkbenchSettings } from './WorkbenchSettings'
 
@@ -11,14 +13,21 @@ export function OfflineNotice({ detail, onRetry }: { detail?: string; onRetry: (
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 py-10">
-      <EmptyState title="没有连上工作台服务" description={description}>
-        <Button size="sm" variant="outline" onClick={onRetry}>
+      <EmptyBlock title="没有连上工作台服务" description={description}>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            onRetry()
+            refreshAllCounts()
+          }}
+        >
           重试
         </Button>
         <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
           更改地址
         </Button>
-      </EmptyState>
+      </EmptyBlock>
       {editing ? (
         <div className="w-full max-w-sm">
           <WorkbenchSettings

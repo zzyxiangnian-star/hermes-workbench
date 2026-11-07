@@ -320,7 +320,6 @@ export function WorkbenchPane() {
       <div className="flex h-full w-full flex-col items-center justify-center p-4">
         <style>{PANE_STYLE}</style>
         <EmptyState
-          icon={<Codicon name="extensions" size="1.25rem" />}
           title="还没有安装工作台"
           description="启用工作台模块后，将在这里列出对应的业务分页。"
         />

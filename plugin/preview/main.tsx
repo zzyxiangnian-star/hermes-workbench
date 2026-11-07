@@ -1,7 +1,7 @@
 import './preview.css'
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { Button, Codicon, EmptyState, cn } from '@hermes/plugin-sdk'
+import { Button, EmptyState, cn } from '@hermes/plugin-sdk'
 import { brandWorkbench } from '../src/modules/brand'
 import { ecommerceWorkbench } from '../src/modules/ecommerce'
 import {
@@ -28,7 +28,6 @@ const longNameWorkbench: WorkbenchDef = {
       render: () => (
         <div className="flex flex-1 items-center justify-center">
           <EmptyState
-            icon={<Codicon name="graph" size="1.25rem" />}
             title="海外仓备货异常与多币种结算毛利核对看板"
             description="用于验证窄面板（200px）下超长工作台与分页名称的省略号截断及按需悬停 Tip。"
           />

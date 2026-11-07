@@ -302,35 +302,21 @@ export function Tip({
 }
 
 export function EmptyState({
-  icon,
   title,
   description,
-  children,
   className
 }: {
-  icon?: ReactNode
-  title: ReactNode
-  description?: ReactNode
-  children?: ReactNode
+  // 和 Hermes 一致：只有这三个参数。不接 children / icon，传了也不显示。
+  title: string
+  description?: string
   className?: string
 }) {
   return (
-    <div
-      className={cn(
-        'flex max-w-sm flex-col items-center justify-center gap-2 text-center',
-        className
-      )}
-    >
-      {icon && (
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-(--ui-stroke-secondary) bg-(--ui-bg-quinary) text-(--ui-text-secondary)">
-          {icon}
-        </div>
-      )}
-      <div className="text-sm font-medium text-(--ui-text-primary)">{title}</div>
-      {description && (
-        <p className="text-xs leading-relaxed text-(--ui-text-tertiary)">{description}</p>
-      )}
-      {children && <div className="mt-1 flex items-center gap-2">{children}</div>}
+    <div className={cn('grid min-h-48 place-items-center text-center', className)}>
+      <div>
+        <div className="text-sm font-medium text-(--ui-text-primary)">{title}</div>
+        {description && <div className="mt-1 text-xs text-(--ui-text-tertiary)">{description}</div>}
+      </div>
     </div>
   )
 }

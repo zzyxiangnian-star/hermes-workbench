@@ -1,8 +1,6 @@
 import { useMemo, useState } from 'react'
 import {
   Button,
-  Codicon,
-  EmptyState,
   ErrorState,
   Input,
   Loader,
@@ -31,6 +29,7 @@ import {
 import { listShops } from '../../api/products'
 import { useQuery } from '../../api/useQuery'
 import { useApiBase } from '../../settings'
+import { EmptyBlock } from '../EmptyBlock'
 import { HeaderActions } from '../HeaderActions'
 import { OfflineNotice } from '../OfflineNotice'
 import { ImportDialog } from '../products/ImportDialog'
@@ -153,15 +152,14 @@ export function OverviewPage() {
 
       {!offline && !error && empty ? (
         <div className="flex flex-1 items-center justify-center py-10">
-          <EmptyState
-            icon={<Codicon name="graph" size="1.25rem" />}
+          <EmptyBlock
             title="还没有经营数据"
             description="导入后台导出的经营表和投放表后显示。也可以在设置里配好报表文件夹，每 10 分钟自动导入。"
           >
             <Button size="sm" onClick={() => setImportOpen(true)}>
               导入经营 / 投放表
             </Button>
-          </EmptyState>
+          </EmptyBlock>
         </div>
       ) : null}
 
