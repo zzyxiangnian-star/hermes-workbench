@@ -168,7 +168,7 @@ class ImportRunOut(APIModel):
 
 class HealthOut(BaseModel):
     status: str = Field(examples=["ok"])
-    version: str = Field(examples=["0.9.0"])
+    version: str = Field(examples=["0.10.0"])
 
 
 class MetricCompare(BaseModel):
