@@ -5,6 +5,8 @@
 输出 dist/工作台-<版本>-<日期>.zip，解压后的结构：
 
     工作台/
+      安装工作台.bat     ← 双击安装 / 升级（install/安装工作台.bat）
+      install/install.ps1
       说明.md            ← docs/交付说明.md
       版本.txt
       plugin.js          ← 放进 %USERPROFILE%\\.hermes\\desktop-plugins\\hermes-workbench\\
@@ -67,7 +69,13 @@ def main() -> None:
         archive.writestr(f"{TOP}/说明.md", (ROOT / "docs" / "交付说明.md").read_bytes())
         archive.writestr(f"{TOP}/版本.txt", info.encode("utf-8"))
         archive.writestr(f"{TOP}/plugin.js", plugin)
-        for name in tracked("server") + tracked("bots") + tracked("docs/CONTRACT-mcp.md"):
+        archive.writestr(f"{TOP}/安装工作台.bat", crlf((ROOT / "install" / "安装工作台.bat").read_bytes()))
+        ps1 = (ROOT / "install" / "install.ps1").read_bytes()
+        if not ps1.startswith(b"\xef\xbb\xbf"):  # Windows PowerShell 5.1 没有 BOM 会把中文读乱
+            ps1 = b"\xef\xbb\xbf" + ps1
+        archive.writestr(f"{TOP}/install/install.ps1", crlf(ps1))
+        count += 2
+        for name in tracked("server") + tracked("bots") + tracked("docs/CONTRACT-mcp.md") + tracked("docs/给Hermes的安装指令.md"):
             data = (ROOT / name).read_bytes()
             if name.endswith((".bat", ".cmd")):
                 data = crlf(data)
