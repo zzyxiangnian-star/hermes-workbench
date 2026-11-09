@@ -29,7 +29,7 @@ def _create(client, **extra):
         "sizes": ["800x800", "750×1000"],
         "copy_text": "一级能效 新风自清洁",
         "brief": "突出省电，背景用浅色客厅",
-        "due_date": "2026-11-08",
+        "due_date": "2099-12-31",
         "requester": "运营小林",
     }
     body.update(extra)
