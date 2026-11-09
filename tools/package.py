@@ -1,14 +1,16 @@
 """打交付包：python tools/package.py
 
-先在 plugin/ 里 `node build.mjs` 打好插件，再运行这个脚本。
+先在 plugin/ 里 `node build.mjs` 打好插件，再运行这个脚本（会顺手更新 desktop/plugin.js）。
 只收仓库里登记过的文件（git ls-files），所以 env.bat、数据库、.venv、素材都不会被带进去。
-输出 dist/工作台-<版本>-<日期>.zip，解压后的结构：
+输出 dist/工作台-<版本>-<日期>.zip。解压后就是一个完整的 Hermes 插件包，双击 安装.bat 即可：
 
     工作台/
+      安装.bat           ← 双击安装 / 升级
       说明.md            ← docs/交付说明.md
       版本.txt
-      plugin.js          ← 放进 %USERPROFILE%\\.hermes\\desktop-plugins\\hermes-workbench\\
-      server/            ← 后端，双击 server\\scripts\\start.bat
+      plugin.yaml  __init__.py  workbench_ctl.py  dashboard/  skills/
+      desktop/plugin.js  ← 界面
+      server/            ← 后端
       bots/              ← 四个助手 Bot 的配方
 """
 
@@ -17,6 +19,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import re
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -58,6 +61,10 @@ def main() -> None:
     out = ROOT / "dist" / f"{TOP}-{ver}-{today}.zip"
     out.parent.mkdir(exist_ok=True)
     plugin = PLUGIN_JS.read_bytes()
+    desktop = ROOT / "desktop" / "plugin.js"
+    if not desktop.exists() or desktop.read_bytes() != plugin:
+        shutil.copyfile(PLUGIN_JS, desktop)
+        print("已更新 desktop/plugin.js，记得提交")
     info = (
         f"工作台 {ver}\r\n打包日期 {today}\r\n代码版本 {commit}\r\n"
         f"plugin.js {len(plugin)} 字节，SHA256 {hashlib.sha256(plugin).hexdigest()}\r\n"
@@ -66,14 +73,17 @@ def main() -> None:
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(f"{TOP}/说明.md", (ROOT / "docs" / "交付说明.md").read_bytes())
         archive.writestr(f"{TOP}/版本.txt", info.encode("utf-8"))
-        archive.writestr(f"{TOP}/plugin.js", plugin)
-        for name in tracked("server") + tracked("bots") + tracked("docs/CONTRACT-mcp.md"):
+        archive.writestr(f"{TOP}/安装.bat", crlf((ROOT / "tools" / "安装.bat").read_bytes()))
+        archive.writestr(f"{TOP}/desktop/plugin.js", plugin)
+        package = ["plugin.yaml", "__init__.py", "workbench_ctl.py", "dashboard", "skills"]
+        names = [n for item in package for n in tracked(item)]
+        for name in names + tracked("server") + tracked("bots") + tracked("docs/CONTRACT-mcp.md"):
             data = (ROOT / name).read_bytes()
             if name.endswith((".bat", ".cmd")):
                 data = crlf(data)
             archive.writestr(f"{TOP}/{name}", data)
             count += 1
-    print(f"已生成 {out.relative_to(ROOT)}（{count + 3} 个文件，{out.stat().st_size // 1024} KB）")
+    print(f"已生成 {out.relative_to(ROOT)}（{count + 4} 个文件，{out.stat().st_size // 1024} KB）")
     print(info.replace("\r\n", "\n").strip())
 
 

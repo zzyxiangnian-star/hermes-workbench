@@ -155,6 +155,16 @@ def status() -> dict:
 
 # ---------- 虚拟环境 ----------
 
+def clean_env() -> dict:
+    """去掉 Hermes 进程带来的 Python 路径设置，否则后端的 pip 会把 Hermes 环境里的包当成已装好。"""
+    env = dict(os.environ)
+    for key in ("PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP", "VIRTUAL_ENV", "PIP_TARGET", "PIP_PREFIX",
+                "PIP_REQUIRE_VIRTUALENV", "__PYVENV_LAUNCHER__"):
+        env.pop(key, None)
+    env["PYTHONIOENCODING"] = "utf-8"
+    return env
+
+
 def _venv_python(venv: Path) -> Path:
     return venv / ("Scripts/python.exe" if IS_WIN else "bin/python")
 
@@ -192,14 +202,15 @@ def ensure_venv(log) -> Path:
     python = _venv_python(venv)
     if not python.exists():
         log("第一次运行，正在创建 Python 环境……")
-        subprocess.run([*_base_python(), "-m", "venv", str(venv)], check=True, stdout=log.stream, stderr=subprocess.STDOUT)
+        subprocess.run([*_base_python(), "-m", "venv", str(venv)], check=True, stdout=log.stream,
+                       stderr=subprocess.STDOUT, env=clean_env())
     reqs = _requirements()
     stamp = venv / "workbench-requirements.txt"
     wanted = "\n".join(reqs)
     if not stamp.exists() or stamp.read_text(encoding="utf-8") != wanted:
         log("正在安装后端依赖（需要联网，第一次要几分钟）……")
         done = subprocess.run([str(python), "-m", "pip", "install", "--disable-pip-version-check", "-q", *reqs],
-                              stdout=log.stream, stderr=subprocess.STDOUT)
+                              stdout=log.stream, stderr=subprocess.STDOUT, env=clean_env())
         if done.returncode != 0:
             if stamp.exists():
                 log("依赖更新失败（可能没联网），先用已装好的版本启动")
@@ -231,9 +242,7 @@ def _load_settings(env: dict) -> None:
 def server_env(demo: bool) -> dict:
     data = work_dir() / "data"
     data.mkdir(parents=True, exist_ok=True)
-    env = dict(os.environ)
-    env.pop("PYTHONPATH", None)
-    env["PYTHONIOENCODING"] = "utf-8"
+    env = clean_env()
     env.setdefault("WB_BACKUP_DIR", str(data / "backups"))
     env.setdefault("WB_ASSET_DIR", str(data / "assets"))
     _load_settings(env)
@@ -299,7 +308,8 @@ def start(demo: bool = False, wait: float = 0) -> dict:
         return {**current, "phase": "failed", "message": f"端口 {PORT} 被别的程序占用，请先关掉它"}
     work = work_dir()
     log = open(work / "backend.log", "a", encoding="utf-8")
-    kwargs: dict = {"stdout": log, "stderr": subprocess.STDOUT, "stdin": subprocess.DEVNULL, "cwd": str(work)}
+    kwargs: dict = {"stdout": log, "stderr": subprocess.STDOUT, "stdin": subprocess.DEVNULL, "cwd": str(work),
+                    "env": clean_env()}
     if IS_WIN:
         kwargs["creationflags"] = (subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
                                    | subprocess.CREATE_NO_WINDOW)
@@ -421,6 +431,21 @@ def _shortcut(name: str, args: str, desc: str) -> None:
                    capture_output=True, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
 
 
+def _enable_agent_half(root: Path) -> bool:
+    """有 hermes 命令时顺手启用插件的后台部分（给界面的启动按钮和对话里的工具用）。没有就算了。"""
+    hermes = shutil.which("hermes")
+    if not hermes:
+        return False
+    env = {**clean_env(), "HERMES_HOME": str(root)}
+    try:
+        done = subprocess.run([hermes, "plugins", "enable", PLUGIN_ID, "--no-allow-tool-override"], env=env,
+                              capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300,
+                              stdin=subprocess.DEVNULL)
+    except Exception:
+        return False
+    return done.returncode == 0
+
+
 def install(start_demo: bool = True) -> int:
     """交付包的“双击安装”。"""
     root = hermes_root()
@@ -433,6 +458,10 @@ def install(start_demo: bool = True) -> int:
     for other in others:
         install_desktop_copy(other)
         print(f"另一个数据目录里也有旧插件，一并换新：{other}")
+    if _enable_agent_half(root):
+        print("已在 Hermes 里启用工作台（页面上会有“启动工作台”按钮，也能在对话里说“启动工作台”）")
+    else:
+        print("提示：到 Hermes 的 Capabilities → Plugins 里把“工作台”打开，页面上就有“启动工作台”按钮。")
     ctl = package / "workbench_ctl.py"
     _shortcut("工作台后端", f'"{ctl}" start --wait --pause', "启动工作台后端（正式数据）")
     _shortcut("工作台演示", f'"{ctl}" demo --wait --pause', "用假数据启动工作台后端")
