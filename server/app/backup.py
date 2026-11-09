@@ -103,6 +103,11 @@ def main() -> None:
     try:
         result = run_backup()
     except AppError as exc:
+        if exc.code == "database_missing":
+            # 只跑过演示、还没用 start.bat 开过正式库的电脑：没有要备份的东西，不算出错。
+            print(f"还没有正式数据（{sqlite_path(default_database_url())} 不存在），不用备份。")
+            print("演示数据（demo.db）不在备份范围内。")
+            return
         raise SystemExit(f"备份失败：{exc.message}") from exc
     print(f"已备份到 {result['dir']}")
     print(f"数据库：{result['database']}（{result['database_bytes'] // 1024} KB），共保留 {result['kept']} 份")
