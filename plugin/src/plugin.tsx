@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { host, ROUTES_AREA, type RouteContribution } from '@hermes/plugin-sdk'
+import { setPluginRest } from './api/backend-control'
 import { injectPluginCss } from './inject-css'
 import { brandWorkbench } from './modules/brand'
 import { ecommerceWorkbench } from './modules/ecommerce'
@@ -23,6 +24,7 @@ interface PluginContext {
     render?: () => ReactNode
   }) => (() => void) | void
   onDispose?: (fn: () => void) => void
+  rest?: <T>(path: string, opts?: { method?: string; body?: unknown; timeoutMs?: number }) => Promise<T>
 }
 
 const BUILTIN_WORKBENCHES = [ecommerceWorkbench, brandWorkbench]
@@ -30,6 +32,7 @@ const BUILTIN_WORKBENCHES = [ecommerceWorkbench, brandWorkbench]
 function setupWorkbenchPlugin(ctx: PluginContext) {
   // 0. 注入打包构建时生成的 Tailwind 样式（卸载时移除）
   injectPluginCss(ctx)
+  setPluginRest(ctx.rest)
 
   // 1. 注册内置的两个工作台模块（电商、品牌活动）
   const disposeWorkbenches = BUILTIN_WORKBENCHES.map(wb => registerWorkbench(wb))

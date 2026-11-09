@@ -1,0 +1,6 @@
+{
+  "name": "hermes-workbench",
+  "label": "工作台",
+  "description": "工作台后端的启动和状态（界面在左上角“工作台”里）。",
+  "api": "plugin_api.py"
+}

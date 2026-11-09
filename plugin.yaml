@@ -1,0 +1,14 @@
+name: hermes-workbench
+version: 0.10.0
+description: "工作台：电商（经营、商品、客户、安装）和品牌活动（活动、内容、设计、资料、视频）两个工作台，左上角“工作台”进入。数据存在本机；不登录电商平台、不改价、不自动发消息，AI 只写草稿和备注。"
+author: zzyxiangnian-star
+manifest_version: 2
+kind: standalone
+platforms:
+  - windows
+  - macos
+  - linux
+# 后端有自己的虚拟环境（workbench\venv），不往 Hermes 的环境里装东西
+python_runtime: external
+provides_tools:
+  - workbench_backend
